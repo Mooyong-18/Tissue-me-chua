@@ -10,25 +10,6 @@
 <title>Tissue Me Chua</title>
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;1,9..40,300&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
-<script type="module">
-import{initializeApp}from"https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-import{getFirestore,collection,doc,getDoc,getDocs,setDoc,updateDoc,deleteDoc,onSnapshot,query,orderBy,serverTimestamp}from"https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
-
-const firebaseConfig={
-  apiKey:"AIzaSyBhe00NfkFOIYvv1JHG4y38FEC8jVOyhCQ",
-  authDomain:"tissue-me-chua.firebaseapp.com",
-  projectId:"tissue-me-chua",
-  storageBucket:"tissue-me-chua.firebasestorage.app",
-  messagingSenderId:"835289897922",
-  appId:"1:835289897922:web:e79a1f487b41a17d78945b"
-};
-
-const fbApp=initializeApp(firebaseConfig);
-const db=getFirestore(fbApp);
-window.FS={db,collection,doc,getDoc,getDocs,setDoc,updateDoc,deleteDoc,onSnapshot,query,orderBy,serverTimestamp};
-window._fbReady=true;
-window.dispatchEvent(new Event('fbReady'));
-</script>
 <style>
 :root{
   --bg:#f5f3ef;
@@ -250,13 +231,6 @@ textarea.inp{resize:vertical;min-height:72px}
 </head>
 <body>
 
-<!-- LOADING SCREEN -->
-<div id="loadingScreen" class="hidden" style="position:fixed;inset:0;background:var(--bg);z-index:9999;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px">
-  <div style="width:48px;height:48px;border:3px solid var(--border2);border-top-color:var(--accent);border-radius:50%;animation:spin .8s linear infinite"></div>
-  <div style="font-size:13px;color:var(--text3)">กำลังโหลดข้อมูลจาก Cloud...</div>
-</div>
-<style>@keyframes spin{to{transform:rotate(360deg)}}</style>
-
 <!-- LOGIN PAGE -->
 <div id="login-page">
   <div class="login-logo">
@@ -280,14 +254,15 @@ textarea.inp{resize:vertical;min-height:72px}
     <div id="loginForm">
       <div class="form-group">
         <label class="form-label">อีเมล</label>
-        <input class="inp" type="email" id="loginEmail" placeholder="อีเมล" autocomplete="email"/>
+        <input class="inp" type="email" id="loginEmail" value="admin@lab.com" autocomplete="email"/>
       </div>
       <div class="form-group">
         <label class="form-label">รหัสผ่าน</label>
-        <input class="inp" type="password" id="loginPass" placeholder="รหัสผ่าน" autocomplete="current-password"/>
+        <input class="inp" type="password" id="loginPass" value="admin123" autocomplete="current-password"/>
       </div>
       <div id="loginError" style="color:var(--danger);font-size:12px;margin-bottom:10px;display:none"></div>
       <button class="btn btn-primary" onclick="doLogin()">เข้าสู่ระบบ</button>
+      <p style="text-align:center;font-size:11px;color:var(--text3);margin-top:12px">Demo: admin@lab.com / admin123<br>หรือ user@lab.com / user123</p>
     </div>
     <div id="registerForm" class="hidden">
       <div class="form-group">
@@ -642,97 +617,52 @@ textarea.inp{resize:vertical;min-height:72px}
 
 <script>
 // ──────────────────────────────────────────────
-// FIRESTORE DB LAYER
+// DATA STORE (localStorage)
 // ──────────────────────────────────────────────
 const DB = {
-  // LOCAL CACHE (for fast UI rendering)
-  _cultures:[],_temps:[],_users:[],_formulas:[
+  get(k){try{return JSON.parse(localStorage.getItem('tmc_'+k)||'null')}catch{return null}},
+  set(k,v){localStorage.setItem('tmc_'+k,JSON.stringify(v))},
+  cultures(){return this.get('cultures')||[]},
+  saveCultures(d){this.set('cultures',d)},
+  temps(){return this.get('temps')||[]},
+  saveTemps(d){this.set('temps',d)},
+  users(){return this.get('users')||[
+    {id:'u1',name:'Admin Lab',email:'admin@lab.com',pass:'admin123',role:'admin',approved:true,avatar:'A'},
+    {id:'u2',name:'นิภา สุวรรณ',email:'user@lab.com',pass:'user123',role:'user',approved:true,avatar:'น'}
+  ]},
+  saveUsers(d){this.set('users',d)},
+  formulas(){return this.get('formulas')||[
     {id:'f1',name:'F1',desc:'MS + BAP 1mg/L'},
     {id:'f2',name:'F2',desc:'MS + NAA 0.5mg/L'},
     {id:'f3',name:'F3',desc:'WPM + Kinetin 2mg/L'},
     {id:'f4',name:'F4',desc:'MS + 2,4-D 1mg/L'},
     {id:'f5',name:'F5',desc:'MS เต็มสูตร'}
-  ],
-  cultures(){return this._cultures},
-  temps(){return this._temps},
-  users(){return this._users},
-  formulas(){return JSON.parse(localStorage.getItem('tmc_formulas')||'null')||this._formulas},
-  saveFormulas(d){localStorage.setItem('tmc_formulas',JSON.stringify(d));this._formulas=d;},
-
-  async saveCulture(c){
-    const{db,doc,setDoc}=FS;
-    await setDoc(doc(db,'cultures',c.id),c);
-    const idx=this._cultures.findIndex(x=>x.id===c.id);
-    if(idx>-1)this._cultures[idx]=c;else this._cultures.push(c);
-  },
-  async deleteCultureById(id){
-    const{db,doc,deleteDoc}=FS;
-    await deleteDoc(doc(db,'cultures',id));
-    this._cultures=this._cultures.filter(c=>c.id!==id);
-  },
-  async saveTemp(t){
-    const{db,doc,setDoc}=FS;
-    await setDoc(doc(db,'temps',t.id),t);
-    this._temps.push(t);
-    this._temps.sort((a,b)=>a.datetime.localeCompare(b.datetime));
-  },
-  async saveUser(u){
-    const{db,doc,setDoc}=FS;
-    const safe={...u};
-    await setDoc(doc(db,'users',u.id),safe);
-    const idx=this._users.findIndex(x=>x.id===u.id);
-    if(idx>-1)this._users[idx]=safe;else this._users.push(safe);
-  },
-  async deleteUserById(id){
-    const{db,doc,deleteDoc}=FS;
-    await deleteDoc(doc(db,'users',id));
-    this._users=this._users.filter(u=>u.id!==id);
-  },
-
-  async loadAll(){
-    const{db,collection,getDocs,query,orderBy}=FS;
-    const [cu,tu,uu]=await Promise.all([
-      getDocs(collection(db,'cultures')),
-      getDocs(collection(db,'temps')),
-      getDocs(collection(db,'users'))
-    ]);
-    this._cultures=cu.docs.map(d=>d.data());
-    this._temps=tu.docs.map(d=>d.data()).sort((a,b)=>a.datetime.localeCompare(b.datetime));
-    this._users=uu.docs.map(d=>d.data());
-  },
-
-  nextCultureId(){
-    const nums=this._cultures.map(c=>{const m=c.id.match(/TMC-(\d+)/);return m?parseInt(m[1]):0;});
-    const max=nums.length?Math.max(...nums):0;
-    return 'TMC-'+String(max+1).padStart(3,'0');
-  }
+  ]},
+  saveFormulas(d){this.set('formulas',d)}
 };
 
-// Seed superadmin + demo data to Firestore if empty
-async function seedDemo(){
-  // Ensure superadmin exists
-  const{db,doc,getDoc,setDoc}=FS;
-  const saRef=doc(db,'users','SUPERADMIN');
-  const saSnap=await getDoc(saRef);
-  if(!saSnap.exists()){
-    await setDoc(saRef,{id:'SUPERADMIN',name:'สาธิต ฉัตรพันธุ์',email:'Satit.c@psru.ac.th',pass:'254102',role:'admin',approved:true,avatar:'ส',superadmin:true});
-  }
-  // Only seed cultures if none exist
-  if(DB._cultures.length>0)return;
+// Seed demo data
+function seedDemo(){
+  if(DB.cultures().length>0)return;
   const today=new Date();
   function daysAgo(n){const d=new Date(today);d.setDate(d.getDate()-n);return d.toISOString().split('T')[0]}
   function daysFwd(n){const d=new Date(today);d.setDate(d.getDate()+n);return d.toISOString().split('T')[0]}
   const cultures=[
-    {id:'TMC-001',plant:'กล้วยไม้แวนด้า',explant:'Shoot Tip',formula:'F3',startDate:daysAgo(14),dueDate:daysFwd(16),operator:'สาธิต',tags:['#ทดลอง','#ชุดA'],note:'Explant ขนาด 1.5cm',status:'growing_well',closedDate:null,updates:[{date:daysAgo(7)+'T10:30',status:'growing_normal',shoots:1,roots:0,shootLen:0.8,rootLen:0,growth:'เริ่มแตกยอดเล็กน้อย',note:'',photos:[]},{date:daysAgo(0)+'T09:00',status:'growing_well',shoots:3,roots:2,shootLen:2.1,rootLen:0.5,growth:'ยอดแตกดี รากเริ่มออก',note:'',photos:[]}],photos:[]},
-    {id:'TMC-002',plant:'กุหลาบ',explant:'Node',formula:'F1',startDate:daysAgo(22),dueDate:daysFwd(8),operator:'สาธิต',tags:['#ชุดA'],note:'',status:'growing_slow',closedDate:null,updates:[],photos:[]},
+    {id:'TMC-001',plant:'กล้วยไม้แวนด้า',explant:'Shoot Tip',formula:'F3',startDate:daysAgo(14),dueDate:daysFwd(16),operator:'นิภา',tags:['#ทดลอง','#ชุดA'],note:'Explant ขนาด 1.5cm',status:'growing_well',closedDate:null,updates:[{date:daysAgo(7)+'T10:30',status:'growing_normal',shoots:1,roots:0,shootLen:0.8,rootLen:0,growth:'เริ่มแตกยอดเล็กน้อย',note:'',photos:[]},{date:daysAgo(0)+'T09:00',status:'growing_well',shoots:3,roots:2,shootLen:2.1,rootLen:0.5,growth:'ยอดแตกดี รากเริ่มออก',note:'',photos:[]}],photos:[]},
+    {id:'TMC-002',plant:'กุหลาบ',explant:'Node',formula:'F1',startDate:daysAgo(22),dueDate:daysFwd(8),operator:'ธนา',tags:['#ชุดA'],note:'',status:'growing_slow',closedDate:null,updates:[{date:daysAgo(10)+'T14:00',status:'growing_slow',shoots:1,roots:1,shootLen:0.5,rootLen:0.3,growth:'โตช้ากว่าที่คาดไว้',note:'อาจเพิ่ม BAP',photos:[]}],photos:[]},
+    {id:'TMC-003',plant:'มะเขือเทศ Cherry',explant:'Leaf Disk',formula:'F2',startDate:daysAgo(18),dueDate:daysFwd(12),operator:'นิภา',tags:['#ทดลอง'],note:'',status:'contaminated',closedDate:daysAgo(4),updates:[{date:daysAgo(4)+'T08:00',status:'contaminated',shoots:0,roots:0,shootLen:0,rootLen:0,growth:'พบเชื้อรา สีดำ ที่ขอบวุ้น',note:'ทิ้งขวด',photos:[]}],photos:[]},
+    {id:'TMC-004',plant:'มะเดื่อ',explant:'Axillary Bud',formula:'F2',startDate:daysAgo(8),dueDate:daysFwd(22),operator:'นิภา',tags:[],note:'',status:'growing_normal',closedDate:null,updates:[],photos:[]},
   ];
-  for(const c of cultures)await DB.saveCulture(c);
+  DB.saveCultures(cultures);
+
   // Seed temp data
-  for(let i=14;i>=0;i--){
+  const temps=[];
+  for(let i=30;i>=0;i--){
     const d=new Date(today);d.setDate(d.getDate()-i);
     const base=26+Math.sin(i*0.3)*2;
-    await DB.saveTemp({id:'t'+Date.now()+'_'+i,datetime:d.toISOString().slice(0,16),temp:parseFloat((base+Math.random()*1.5-0.7).toFixed(1)),humidity:Math.round(60+Math.random()*15),note:''});
+    temps.push({id:'t'+i,datetime:d.toISOString().slice(0,16),temp:parseFloat((base+Math.random()*1.5-0.7).toFixed(1)),humidity:Math.round(60+Math.random()*15),note:''});
   }
+  DB.saveTemps(temps);
 }
 
 // ──────────────────────────────────────────────
@@ -773,20 +703,20 @@ function doLogin(){
   document.getElementById('mainFab').classList.remove('hidden');
   initApp();
 }
-async function doRegister(){
+function doRegister(){
   const name=document.getElementById('regName').value.trim();
   const email=document.getElementById('regEmail').value.trim();
   const pass=document.getElementById('regPass').value;
   const err=document.getElementById('regError');
   if(!name||!email||!pass){err.textContent='กรุณากรอกข้อมูลให้ครบ';err.style.display='block';return}
   if(pass.length<6){err.textContent='รหัสผ่านต้องมีอย่างน้อย 6 ตัวอักษร';err.style.display='block';return}
-  if(DB.users().find(u=>u.email===email)){err.textContent='อีเมลนี้ถูกใช้งานแล้ว';err.style.display='block';return}
+  const users=DB.users();
+  if(users.find(u=>u.email===email)){err.textContent='อีเมลนี้ถูกใช้งานแล้ว';err.style.display='block';return}
+  users.push({id:'u'+Date.now(),name,email,pass,role:'user',approved:false,avatar:name[0]});
+  DB.saveUsers(users);
   err.style.display='none';
-  try{
-    await doRegisterFirestore(name,email,pass);
-    showToast('ส่งคำขอลงทะเบียนแล้ว รอ Admin อนุมัติ');
-    switchAuthTab('login');
-  }catch(e){err.textContent='เกิดข้อผิดพลาด กรุณาลองใหม่';err.style.display='block';}
+  showToast('ส่งคำขอลงทะเบียนแล้ว รอ Admin อนุมัติ');
+  switchAuthTab('login');
 }
 function doLogout(){
   currentUser=null;
@@ -799,15 +729,8 @@ function doLogout(){
 // ──────────────────────────────────────────────
 // INIT
 // ──────────────────────────────────────────────
-async function initApp(){
-  // Show loading
-  document.getElementById('loadingScreen').classList.remove('hidden');
-  try{
-    await DB.loadAll();
-    await seedDemo();
-    await DB.loadAll(); // reload after seed
-  }catch(e){console.error('Firebase load error',e);}
-  document.getElementById('loadingScreen').classList.add('hidden');
+function initApp(){
+  seedDemo();
   populateFormulaSelect();
   setDefaultDates();
   showPage('dashboard');
@@ -1096,36 +1019,38 @@ function editCulture(id){
   setTimeout(()=>{ document.getElementById('f_formula').value=c.formula; },50);
 }
 
-async function saveCulture(){
+function saveCulture(){
   const plant=document.getElementById('f_plant').value.trim();
   const explant=document.getElementById('f_explant').value;
   const formula=document.getElementById('f_formula').value;
   const startDate=document.getElementById('f_startdate').value;
   if(!plant||!explant||!formula||!startDate){showToast('กรุณากรอกข้อมูลที่จำเป็น');return;}
-  showToast('กำลังบันทึก...');
+  const cultures=DB.cultures();
   if(editMode&&currentDetailId){
-    const c=DB.cultures().find(x=>x.id===currentDetailId);
-    if(c){
-      const updated={...c,plant,explant,formula,startDate,dueDate:document.getElementById('f_duedate').value||null,operator:document.getElementById('f_operator').value.trim(),tags:document.getElementById('f_tags').value.trim().split(/\s+/).filter(Boolean),note:document.getElementById('f_note').value.trim()};
-      if(pendingPhotosAdd.length)updated.photos=[...(c.photos||[]),...pendingPhotosAdd];
-      await DB.saveCulture(updated);
+    const idx=cultures.findIndex(c=>c.id===currentDetailId);
+    if(idx>-1){
+      cultures[idx]={...cultures[idx],plant,explant,formula,startDate,dueDate:document.getElementById('f_duedate').value||null,operator:document.getElementById('f_operator').value.trim(),tags:document.getElementById('f_tags').value.trim().split(/\s+/).filter(Boolean),note:document.getElementById('f_note').value.trim()};
+      if(pendingPhotosAdd.length)cultures[idx].photos=[...(cultures[idx].photos||[]),...pendingPhotosAdd];
     }
+    DB.saveCultures(cultures);
     editMode=false;
     showToast('แก้ไขสำเร็จ');
     showDetail(currentDetailId);
   } else {
-    const id=DB.nextCultureId();
+    const id='TMC-'+String(cultures.length+1).padStart(3,'0');
     const newC={id,plant,explant,formula,startDate,dueDate:document.getElementById('f_duedate').value||null,operator:document.getElementById('f_operator').value.trim(),tags:document.getElementById('f_tags').value.trim().split(/\s+/).filter(Boolean),note:document.getElementById('f_note').value.trim(),status:'growing_normal',closedDate:null,updates:[],photos:pendingPhotosAdd.slice()};
-    await DB.saveCulture(newC);
+    cultures.push(newC);
+    DB.saveCultures(cultures);
     pendingPhotosAdd=[];
     showToast('บันทึก Culture '+id+' สำเร็จ');
     showPage('list');
   }
 }
 
-async function deleteCulture(id){
+function deleteCulture(id){
   if(!confirm('ลบ Culture '+id+' ใช่ไหม?'))return;
-  await DB.deleteCultureById(id);
+  const cultures=DB.cultures().filter(c=>c.id!==id);
+  DB.saveCultures(cultures);
   showToast('ลบแล้ว');
   showPage('list');
 }
@@ -1143,10 +1068,11 @@ function openUpdateModal(id){
   document.getElementById('updateModal').classList.remove('hidden');
 }
 
-async function saveUpdate(){
+function saveUpdate(){
   const id=currentDetailId;
-  const c=DB.cultures().find(x=>x.id===id);
-  if(!c)return;
+  const cultures=DB.cultures();
+  const idx=cultures.findIndex(c=>c.id===id);
+  if(idx<0)return;
   const status=document.getElementById('u_status').value;
   const update={
     date:new Date().toISOString().slice(0,16),
@@ -1159,11 +1085,12 @@ async function saveUpdate(){
     note:document.getElementById('u_note').value.trim(),
     photos:pendingPhotosUpdate.slice()
   };
-  const updated={...c,status,updates:[...(c.updates||[]),update]};
+  if(!cultures[idx].updates)cultures[idx].updates=[];
+  cultures[idx].updates.push(update);
+  cultures[idx].status=status;
   const closeDate=document.getElementById('u_closedate').value;
-  if(closeDate)updated.closedDate=closeDate;
-  showToast('กำลังบันทึก...');
-  await DB.saveCulture(updated);
+  if(closeDate)cultures[idx].closedDate=closeDate;
+  DB.saveCultures(cultures);
   closeModal('updateModal');
   pendingPhotosUpdate=[];
   showToast('อัพเดตสำเร็จ');
@@ -1207,14 +1134,15 @@ function closeLightbox(){document.getElementById('lightbox').classList.add('hidd
 // ──────────────────────────────────────────────
 // TEMPERATURE
 // ──────────────────────────────────────────────
-async function saveTemp(){
+function saveTemp(){
   const temp=parseFloat(document.getElementById('t_temp').value);
   const humid=document.getElementById('t_humid').value?parseFloat(document.getElementById('t_humid').value):null;
   const datetime=document.getElementById('t_datetime').value;
   const note=document.getElementById('t_note').value.trim();
   if(!datetime||isNaN(temp)){showToast('กรุณากรอกวัน-เวลาและอุณหภูมิ');return;}
-  showToast('กำลังบันทึก...');
-  await DB.saveTemp({id:'t'+Date.now(),datetime,temp,humidity:humid,note});
+  const temps=DB.temps();
+  temps.push({id:'t'+Date.now(),datetime,temp,humidity:humid,note});
+  DB.saveTemps(temps);
   document.getElementById('t_temp').value='';
   document.getElementById('t_humid').value='';
   document.getElementById('t_note').value='';
@@ -1345,90 +1273,22 @@ function renderUserManagement(){
   </div>`).join(''):`<div style="font-size:12px;color:var(--text3);padding:8px 0">ไม่มีคำขอรออนุมัติ</div>`;
   document.getElementById('pendingUsers').innerHTML=`<div class="card">${pendHtml}</div>`;
 
-  const isSuperAdmin=currentUser.superadmin===true;
-  let allHtml=approved.map(u=>{
-    const isSA=u.superadmin===true;
-    const roleLabel=u.role==='admin'?'Admin':'User';
-    const roleClass=u.role==='admin'?'role-admin':'role-user';
-    const canManage=!isSA;
-    let actions='';
-    if(canManage){
-      const toggleLabel=u.role==='admin'?'เปลี่ยนเป็น User':'เปลี่ยนเป็น Admin';
-      actions=`<div style="display:flex;flex-direction:column;gap:4px;align-items:flex-end">
-        <button class="btn btn-outline btn-sm" style="font-size:10px;padding:4px 8px" onclick="toggleUserRole('${u.id}')">${toggleLabel}</button>
-        <button class="btn btn-outline btn-sm" style="font-size:10px;padding:4px 8px;color:var(--danger);border-color:var(--danger)" onclick="deleteUser('${u.id}','${u.name}')">ลบบัญชี</button>
-      </div>`;
-    } else {
-      actions=`<span style="font-size:10px;color:var(--text3);padding:4px">ปกป้อง</span>`;
-    }
-    return `<div class="user-item">
-      <div class="user-avatar" style="background:var(--accent-light);color:var(--accent-text)">${u.avatar||u.name[0]}</div>
-      <div style="flex:1"><div class="user-name">${u.name}${isSA?` <span style="font-size:9px;background:var(--info-light);color:var(--info-text);padding:1px 5px;border-radius:4px;margin-left:4px">ผู้ดูแลหลัก</span>`:''}
-      </div><div style="font-size:11px;color:var(--text3)">${u.email}</div>
-      <span class="user-role ${roleClass}">${roleLabel}</span></div>
-      ${actions}
-    </div>`;
-  }).join('');
-
-  // Also show add-user form for admin
-  const addUserForm=`<div class="card" style="margin-top:12px">
-    <div class="section-label" style="margin-bottom:10px">เพิ่มผู้ใช้โดย Admin</div>
-    <div class="form-group"><label class="form-label">ชื่อ-นามสกุล</label><input class="inp" id="adminNewName" placeholder="ชื่อผู้ใช้"/></div>
-    <div class="form-group"><label class="form-label">อีเมล</label><input class="inp" id="adminNewEmail" type="email" placeholder="อีเมล"/></div>
-    <div class="form-group"><label class="form-label">รหัสผ่าน</label><input class="inp" id="adminNewPass" type="password" placeholder="อย่างน้อย 6 ตัวอักษร"/></div>
-    <div class="form-group" style="margin-bottom:10px"><label class="form-label">บทบาท</label>
-      <select class="inp" id="adminNewRole"><option value="user">User</option><option value="admin">Admin</option></select>
-    </div>
-    <button class="btn btn-primary" onclick="adminAddUser()">เพิ่มผู้ใช้</button>
-  </div>`;
-
-  document.getElementById('allUsers').innerHTML=`<div class="card">${allHtml||'<div style="font-size:12px;color:var(--text3);padding:8px 0">ไม่มีผู้ใช้อื่น</div>'}</div>${addUserForm}`;
+  let allHtml=approved.map(u=>`<div class="user-item">
+    <div class="user-avatar" style="background:var(--accent-light);color:var(--accent-text)">${u.avatar||u.name[0]}</div>
+    <div style="flex:1"><div class="user-name">${u.name}</div><div style="font-size:11px;color:var(--text3)">${u.email}</div></div>
+    <span class="user-role ${u.role==='admin'?'role-admin':'role-user'}">${u.role==='admin'?'Admin':'User'}</span>
+  </div>`).join('');
+  document.getElementById('allUsers').innerHTML=`<div class="card">${allHtml||'<div style="font-size:12px;color:var(--text3);padding:8px 0">ไม่มีผู้ใช้อื่น</div>'}</div>`;
 }
 
-async function approveUser(id){
-  const u=DB.users().find(x=>x.id===id);
-  if(u){u.approved=true;await DB.saveUser(u);showToast('อนุมัติ '+u.name+' แล้ว');renderUserManagement();}
+function approveUser(id){
+  const users=DB.users();
+  const u=users.find(x=>x.id===id);
+  if(u){u.approved=true;DB.saveUsers(users);showToast('อนุมัติ '+u.name+' แล้ว');renderUserManagement();}
 }
-async function rejectUser(id){
-  await DB.deleteUserById(id);
-  showToast('ปฏิเสธแล้ว');renderUserManagement();
-}
-async function toggleUserRole(id){
-  const u=DB.users().find(x=>x.id===id);
-  if(!u||u.superadmin)return;
-  u.role=u.role==='admin'?'user':'admin';
-  await DB.saveUser(u);
-  showToast('เปลี่ยนบทบาท '+u.name+' เป็น '+(u.role==='admin'?'Admin':'User')+' แล้ว');
-  renderUserManagement();
-}
-async function deleteUser(id,name){
-  const u=DB.users().find(x=>x.id===id);
-  if(!u||u.superadmin){showToast('ไม่สามารถลบผู้ดูแลหลักได้');return;}
-  if(!confirm('ลบบัญชี "'+name+'" ใช่ไหม?'))return;
-  await DB.deleteUserById(id);
-  showToast('ลบบัญชี '+name+' แล้ว');
-  renderUserManagement();
-}
-async function adminAddUser(){
-  const name=document.getElementById('adminNewName').value.trim();
-  const email=document.getElementById('adminNewEmail').value.trim();
-  const pass=document.getElementById('adminNewPass').value;
-  const role=document.getElementById('adminNewRole').value;
-  if(!name||!email||!pass){showToast('กรุณากรอกข้อมูลให้ครบ');return;}
-  if(pass.length<6){showToast('รหัสผ่านต้องมีอย่างน้อย 6 ตัวอักษร');return;}
-  if(DB.users().find(u=>u.email===email)){showToast('อีเมลนี้ถูกใช้งานแล้ว');return;}
-  const newUser={id:'u'+Date.now(),name,email,pass,role,approved:true,avatar:name[0]};
-  await DB.saveUser(newUser);
-  document.getElementById('adminNewName').value='';
-  document.getElementById('adminNewEmail').value='';
-  document.getElementById('adminNewPass').value='';
-  document.getElementById('adminNewRole').value='user';
-  showToast('เพิ่ม '+name+' ('+role+') สำเร็จ');
-  renderUserManagement();
-}
-async function doRegisterFirestore(name,email,pass){
-  const newUser={id:'u'+Date.now(),name,email,pass,role:'user',approved:false,avatar:name[0]};
-  await DB.saveUser(newUser);
+function rejectUser(id){
+  const users=DB.users().filter(x=>x.id!==id);
+  DB.saveUsers(users);showToast('ปฏิเสธแล้ว');renderUserManagement();
 }
 
 function renderFormulaList(){
@@ -1482,22 +1342,7 @@ function showToast(msg){const t=document.getElementById('toast');t.textContent=m
 
 // Init
 window.addEventListener('DOMContentLoaded',()=>{
-  // Wait for Firebase module to be ready
-  function onFbReady(){
-    // Pre-load users for login check (lightweight)
-    const{db,collection,getDocs}=FS;
-    getDocs(collection(db,'users')).then(snap=>{
-      DB._users=snap.docs.map(d=>d.data());
-      // Ensure superadmin exists
-      if(!DB._users.find(u=>u.superadmin)){
-        const{doc,setDoc}=FS;
-        const sa={id:'SUPERADMIN',name:'สาธิต ฉัตรพันธุ์',email:'Satit.c@psru.ac.th',pass:'254102',role:'admin',approved:true,avatar:'ส',superadmin:true};
-        setDoc(doc(db,'users','SUPERADMIN'),sa).then(()=>{DB._users.push(sa);});
-      }
-    });
-  }
-  if(window._fbReady)onFbReady();
-  else window.addEventListener('fbReady',onFbReady);
+  if(!localStorage.getItem('tmc_users'))DB.saveUsers(DB.users());
 });
 </script>
 </body>
