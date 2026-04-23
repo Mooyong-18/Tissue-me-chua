@@ -1,0 +1,1421 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Tissue Me Chua">
+<meta name="theme-color" content="#f5f3ef">
+<title>Tissue Me Chua</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;1,9..40,300&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+<style>
+:root{
+  --bg:#f5f3ef;
+  --bg2:#eceae4;
+  --bg3:#e0ddd6;
+  --card:#ffffff;
+  --border:#d8d5ce;
+  --border2:#c8c4bb;
+  --text:#1a1917;
+  --text2:#6b6760;
+  --text3:#9c9890;
+  --accent:#2d6a4f;
+  --accent2:#40916c;
+  --accent-light:#d8f3dc;
+  --accent-text:#1b4332;
+  --warn:#b45309;
+  --warn-light:#fef3c7;
+  --warn-text:#92400e;
+  --danger:#b91c1c;
+  --danger-light:#fee2e2;
+  --danger-text:#7f1d1d;
+  --info:#1d4ed8;
+  --info-light:#dbeafe;
+  --info-text:#1e3a8a;
+  --purple:#6d28d9;
+  --purple-light:#ede9fe;
+  --radius:12px;
+  --radius-sm:8px;
+  --shadow:0 1px 3px rgba(0,0,0,.06),0 1px 2px rgba(0,0,0,.04);
+  --shadow-md:0 4px 12px rgba(0,0,0,.08),0 2px 4px rgba(0,0,0,.05);
+}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);font-size:14px;line-height:1.5;min-height:100vh;overflow-x:hidden}
+input,select,textarea,button{font-family:'DM Sans',sans-serif;font-size:14px}
+button{cursor:pointer;border:none;background:none}
+.hidden{display:none!important}
+
+/* ── LAYOUT ── */
+#app{display:flex;flex-direction:column;min-height:100vh;max-width:480px;margin:0 auto;background:var(--bg)}
+.topbar{position:sticky;top:0;z-index:100;background:var(--card);border-bottom:1px solid var(--border);padding:12px 16px;display:flex;align-items:center;justify-content:space-between}
+.topbar-title{font-size:15px;font-weight:600;color:var(--text)}
+.topbar-sub{font-size:11px;color:var(--text3);margin-top:1px}
+.content{flex:1;overflow-y:auto;padding-bottom:80px}
+.page{display:none;animation:fadeIn .18s ease}
+.page.active{display:block}
+@keyframes fadeIn{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:translateY(0)}}
+
+/* ── BOTTOM NAV ── */
+.bottom-nav{position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:100%;max-width:480px;background:var(--card);border-top:1px solid var(--border);display:flex;z-index:200;padding-bottom:env(safe-area-inset-bottom)}
+.nav-btn{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:8px 0 6px;color:var(--text3);font-size:9px;font-weight:500;letter-spacing:.3px;gap:4px;transition:color .15s}
+.nav-btn.active{color:var(--accent)}
+.nav-btn svg{width:20px;height:20px;stroke-width:1.7}
+.nav-dot{width:4px;height:4px;border-radius:50%;background:var(--danger);position:absolute;top:6px;right:calc(50% - 12px)}
+
+/* ── COMPONENTS ── */
+.section{padding:16px}
+.section+.section{padding-top:0}
+.section-label{font-size:11px;font-weight:600;letter-spacing:.6px;color:var(--text3);text-transform:uppercase;margin-bottom:10px}
+.card{background:var(--card);border-radius:var(--radius);border:1px solid var(--border);padding:14px;box-shadow:var(--shadow)}
+.card+.card{margin-top:8px}
+
+/* STATUS BADGES */
+.badge{display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:500;padding:3px 8px;border-radius:20px}
+.badge::before{content:'';width:5px;height:5px;border-radius:50%;flex-shrink:0}
+.b-good{background:var(--accent-light);color:var(--accent-text)}.b-good::before{background:var(--accent)}
+.b-norm{background:#e0f2fe;color:#0c4a6e}.b-norm::before{background:#0284c7}
+.b-slow{background:var(--warn-light);color:var(--warn-text)}.b-slow::before{background:var(--warn)}
+.b-cont{background:var(--danger-light);color:var(--danger-text)}.b-cont::before{background:var(--danger)}
+.b-sub{background:var(--purple-light);color:#4c1d95}.b-sub::before{background:var(--purple)}
+.b-close{background:var(--bg2);color:var(--text3)}.b-close::before{background:var(--text3)}
+.b-pend{background:#fef9c3;color:#713f12}.b-pend::before{background:#ca8a04}
+
+/* FORM */
+.form-group{margin-bottom:14px}
+.form-label{display:block;font-size:12px;font-weight:500;color:var(--text2);margin-bottom:5px}
+.form-req{color:var(--danger)}
+.inp{width:100%;background:var(--bg);border:1px solid var(--border2);border-radius:var(--radius-sm);padding:10px 12px;color:var(--text);transition:border .15s;outline:none}
+.inp:focus{border-color:var(--accent);background:var(--card)}
+select.inp{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%239c9890' d='M6 8L1 3h10z'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 10px center;padding-right:28px}
+textarea.inp{resize:vertical;min-height:72px}
+.form-row{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.inp-unit{position:relative}.inp-unit .inp{padding-right:36px}.inp-unit span{position:absolute;right:10px;top:50%;transform:translateY(-50%);font-size:12px;color:var(--text3)}
+
+/* BUTTONS */
+.btn{padding:11px 20px;border-radius:var(--radius-sm);font-weight:500;transition:all .15s;display:inline-flex;align-items:center;gap:6px;justify-content:center}
+.btn-primary{background:var(--accent);color:#fff;width:100%}
+.btn-primary:active{background:var(--accent-text)}
+.btn-secondary{background:var(--bg2);color:var(--text);width:100%}
+.btn-secondary:active{background:var(--bg3)}
+.btn-danger{background:var(--danger-light);color:var(--danger-text);width:100%}
+.btn-outline{background:transparent;border:1px solid var(--border2);color:var(--text);padding:8px 16px;border-radius:var(--radius-sm)}
+.btn-sm{padding:6px 12px;font-size:12px;border-radius:6px}
+
+/* CULTURE CARD */
+.culture-card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:14px;cursor:pointer;transition:box-shadow .15s;box-shadow:var(--shadow)}
+.culture-card:active{box-shadow:none}
+.culture-card+.culture-card{margin-top:8px}
+.cc-header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:6px}
+.cc-id{font-size:10px;font-family:'DM Mono',monospace;color:var(--text3);margin-bottom:2px}
+.cc-name{font-size:15px;font-weight:600;color:var(--text)}
+.cc-meta{font-size:12px;color:var(--text2);margin-top:2px}
+.cc-footer{display:flex;justify-content:space-between;align-items:center;margin-top:10px;padding-top:10px;border-top:1px solid var(--border)}
+.duration-chip{font-size:11px;font-weight:500;color:var(--accent-text);background:var(--accent-light);padding:3px 8px;border-radius:6px}
+.prog{height:3px;background:var(--bg3);border-radius:2px;margin-top:8px;overflow:hidden}
+.prog-fill{height:100%;background:var(--accent);border-radius:2px;transition:width .3s}
+.prog-fill.warn{background:var(--warn)}
+.prog-fill.danger{background:var(--danger)}
+
+/* STAT CARDS */
+.stats-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.stat-card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:14px;box-shadow:var(--shadow)}
+.stat-num{font-size:26px;font-weight:600;color:var(--text);line-height:1}
+.stat-label{font-size:11px;color:var(--text3);margin-top:4px}
+.stat-accent{color:var(--accent)}
+.stat-warn{color:var(--warn)}
+.stat-danger{color:var(--danger)}
+
+/* ALERT */
+.alert{border-radius:var(--radius-sm);padding:12px;margin-bottom:8px;display:flex;gap:10px;align-items:flex-start}
+.alert-warn{background:var(--warn-light);border:1px solid #fcd34d}
+.alert-danger{background:var(--danger-light);border:1px solid #fca5a5}
+.alert-success{background:var(--accent-light);border:1px solid #86efac}
+.alert-icon{width:18px;height:18px;flex-shrink:0;margin-top:1px}
+.alert-title{font-size:12px;font-weight:600;margin-bottom:1px}
+.alert-body{font-size:11px;color:var(--text2)}
+
+/* FILTER ROW */
+.filter-scroll{display:flex;gap:6px;overflow-x:auto;padding:0 16px 10px;scrollbar-width:none}
+.filter-scroll::-webkit-scrollbar{display:none}
+.chip{padding:5px 12px;border-radius:20px;border:1px solid var(--border2);background:var(--card);color:var(--text2);font-size:12px;white-space:nowrap;cursor:pointer;transition:all .12s}
+.chip.active{background:var(--accent);color:#fff;border-color:var(--accent)}
+
+/* SEARCH */
+.search-wrap{position:relative;margin:0 16px 12px}
+.search-wrap input{width:100%;padding:9px 12px 9px 34px;background:var(--card);border:1px solid var(--border2);border-radius:var(--radius-sm);outline:none}
+.search-wrap svg{position:absolute;left:10px;top:50%;transform:translateY(-50%);color:var(--text3)}
+
+/* TIMELINE */
+.timeline{padding-left:16px;border-left:2px solid var(--border)}
+.tl-item{position:relative;padding-left:16px;padding-bottom:16px}
+.tl-item:last-child{padding-bottom:0}
+.tl-dot{position:absolute;left:-9px;top:3px;width:12px;height:12px;border-radius:50%;background:var(--accent);border:2px solid var(--bg)}
+.tl-date{font-size:10px;color:var(--text3);font-family:'DM Mono',monospace}
+.tl-text{font-size:13px;color:var(--text);margin-top:2px}
+.tl-sub{font-size:11px;color:var(--text2);margin-top:2px}
+
+/* PHOTO GRID */
+.photo-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;margin-top:10px}
+.photo-thumb{aspect-ratio:1;border-radius:var(--radius-sm);overflow:hidden;background:var(--bg2);border:1px solid var(--border);cursor:pointer;position:relative}
+.photo-thumb img{width:100%;height:100%;object-fit:cover}
+.photo-thumb .photo-date{position:absolute;bottom:0;left:0;right:0;background:rgba(0,0,0,.5);color:#fff;font-size:9px;padding:3px;text-align:center;font-family:'DM Mono',monospace}
+.photo-add-btn{aspect-ratio:1;border-radius:var(--radius-sm);border:1.5px dashed var(--border2);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;color:var(--text3);font-size:11px;cursor:pointer;background:var(--bg);transition:border-color .15s}
+.photo-add-btn:hover{border-color:var(--accent);color:var(--accent)}
+
+/* MODAL */
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:500;display:flex;align-items:flex-end;justify-content:center}
+.modal-overlay.hidden{display:none}
+.modal-sheet{background:var(--card);border-radius:var(--radius) var(--radius) 0 0;width:100%;max-width:480px;max-height:92vh;overflow-y:auto;padding:0 0 env(safe-area-inset-bottom)}
+.modal-handle{width:36px;height:4px;background:var(--border2);border-radius:2px;margin:10px auto 0}
+.modal-header{padding:14px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between}
+.modal-title{font-size:15px;font-weight:600}
+.modal-body{padding:16px}
+.modal-footer{padding:12px 16px;border-top:1px solid var(--border);display:flex;gap:8px}
+.modal-footer .btn{flex:1}
+
+/* LOGIN */
+#login-page{min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:32px;background:var(--bg)}
+.login-logo{width:80px;height:80px;background:var(--card);border-radius:50%;border:1.5px solid var(--border2);display:flex;align-items:center;justify-content:center;margin-bottom:20px;box-shadow:var(--shadow-md)}
+.login-title{font-size:22px;font-weight:700;color:var(--text);margin-bottom:4px}
+.login-sub{font-size:12px;color:var(--text3);margin-bottom:32px;letter-spacing:.3px}
+.login-form{width:100%}
+.tab-row{display:flex;background:var(--bg2);border-radius:var(--radius-sm);padding:3px;margin-bottom:20px}
+.tab-btn{flex:1;padding:8px;border-radius:6px;font-size:13px;font-weight:500;color:var(--text2);transition:all .15s;text-align:center}
+.tab-btn.active{background:var(--card);color:var(--text);box-shadow:var(--shadow)}
+
+/* CHART */
+.chart-container{position:relative;height:200px}
+.chart-tabs{display:flex;gap:6px;margin-bottom:12px;flex-wrap:wrap}
+.chart-tab{padding:4px 10px;border-radius:20px;font-size:11px;border:1px solid var(--border2);background:var(--card);color:var(--text2);cursor:pointer}
+.chart-tab.active{background:var(--accent);color:#fff;border-color:var(--accent)}
+
+/* SETTINGS */
+.setting-row{display:flex;align-items:center;justify-content:space-between;padding:12px 0;border-bottom:1px solid var(--border)}
+.setting-row:last-child{border-bottom:none}
+.setting-label{font-size:14px;color:var(--text)}
+.setting-sub{font-size:11px;color:var(--text3);margin-top:1px}
+.toggle{width:40px;height:22px;background:var(--border2);border-radius:11px;position:relative;cursor:pointer;transition:background .2s;flex-shrink:0}
+.toggle.on{background:var(--accent)}
+.toggle::after{content:'';position:absolute;width:16px;height:16px;background:#fff;border-radius:50%;top:3px;left:3px;transition:left .2s;box-shadow:0 1px 3px rgba(0,0,0,.2)}
+.toggle.on::after{left:21px}
+
+/* PHOTO LIGHTBOX */
+.lightbox{position:fixed;inset:0;background:rgba(0,0,0,.9);z-index:600;display:flex;align-items:center;justify-content:center}
+.lightbox.hidden{display:none}
+.lightbox img{max-width:100%;max-height:80vh;border-radius:var(--radius-sm)}
+.lightbox-close{position:absolute;top:16px;right:16px;color:#fff;font-size:24px;cursor:pointer}
+
+/* BACK BUTTON */
+.back-btn{display:flex;align-items:center;gap:6px;color:var(--text2);font-size:13px;padding:0;background:none;border:none;cursor:pointer;margin-bottom:16px}
+.back-btn svg{width:16px;height:16px;stroke:var(--text2)}
+
+/* USER LIST */
+.user-item{display:flex;align-items:center;gap:12px;padding:12px 0;border-bottom:1px solid var(--border)}
+.user-avatar{width:36px;height:36px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:600;flex-shrink:0}
+.user-name{font-size:14px;font-weight:500;color:var(--text)}
+.user-role{font-size:10px;padding:2px 6px;border-radius:4px;display:inline-block;margin-top:2px}
+.role-admin{background:var(--info-light);color:var(--info-text)}
+.role-user{background:var(--accent-light);color:var(--accent-text)}
+
+/* EMPTY STATE */
+.empty{text-align:center;padding:40px 20px}
+.empty-icon{font-size:40px;margin-bottom:12px;opacity:.4}
+.empty-text{font-size:14px;color:var(--text3)}
+
+/* FAB */
+.fab{position:fixed;bottom:88px;right:16px;width:48px;height:48px;background:var(--accent);border-radius:50%;border:none;color:#fff;font-size:22px;display:flex;align-items:center;justify-content:center;box-shadow:var(--shadow-md);z-index:199;cursor:pointer;transition:transform .15s}
+.fab:active{transform:scale(.93)}
+</style>
+</head>
+<body>
+
+<!-- LOGIN PAGE -->
+<div id="login-page">
+  <div class="login-logo">
+    <svg width="38" height="38" viewBox="0 0 38 38" fill="none">
+      <ellipse cx="19" cy="30" rx="11" ry="5" fill="#d8f3dc"/>
+      <path d="M13 30 Q13 16 19 11 Q25 16 25 30" fill="#b7e4c7" stroke="#2d6a4f" stroke-width="1.2"/>
+      <path d="M19 20 Q14 13 12 8" stroke="#40916c" stroke-width="1.8" fill="none" stroke-linecap="round"/>
+      <path d="M19 20 Q24 13 26 8" stroke="#40916c" stroke-width="1.8" fill="none" stroke-linecap="round"/>
+      <circle cx="19" cy="11" r="2.5" fill="#2d6a4f"/>
+      <circle cx="12" cy="8" r="2" fill="#52b788"/>
+      <circle cx="26" cy="8" r="2" fill="#52b788"/>
+    </svg>
+  </div>
+  <div class="login-title">Tissue Me Chua</div>
+  <div class="login-sub">Plant Tissue Culture Lab</div>
+  <div class="login-form">
+    <div class="tab-row" id="authTabs">
+      <div class="tab-btn active" onclick="switchAuthTab('login')">เข้าสู่ระบบ</div>
+      <div class="tab-btn" onclick="switchAuthTab('register')">ลงทะเบียน</div>
+    </div>
+    <div id="loginForm">
+      <div class="form-group">
+        <label class="form-label">อีเมล</label>
+        <input class="inp" type="email" id="loginEmail" placeholder="อีเมล" autocomplete="email"/>
+      </div>
+      <div class="form-group">
+        <label class="form-label">รหัสผ่าน</label>
+        <input class="inp" type="password" id="loginPass" placeholder="รหัสผ่าน" autocomplete="current-password"/>
+      </div>
+      <div id="loginError" style="color:var(--danger);font-size:12px;margin-bottom:10px;display:none"></div>
+      <button class="btn btn-primary" onclick="doLogin()">เข้าสู่ระบบ</button>
+    </div>
+    <div id="registerForm" class="hidden">
+      <div class="form-group">
+        <label class="form-label">ชื่อ-นามสกุล <span class="form-req">*</span></label>
+        <input class="inp" type="text" id="regName" placeholder="เช่น นิภา สุวรรณ"/>
+      </div>
+      <div class="form-group">
+        <label class="form-label">อีเมล <span class="form-req">*</span></label>
+        <input class="inp" type="email" id="regEmail" placeholder="name@email.com"/>
+      </div>
+      <div class="form-group">
+        <label class="form-label">รหัสผ่าน <span class="form-req">*</span></label>
+        <input class="inp" type="password" id="regPass" placeholder="อย่างน้อย 6 ตัวอักษร"/>
+      </div>
+      <div id="regError" style="color:var(--danger);font-size:12px;margin-bottom:10px;display:none"></div>
+      <button class="btn btn-primary" onclick="doRegister()">ส่งคำขอลงทะเบียน</button>
+      <p style="text-align:center;font-size:11px;color:var(--text3);margin-top:12px">Admin จะต้องอนุมัติก่อนเข้าใช้งานได้</p>
+    </div>
+  </div>
+</div>
+
+<!-- MAIN APP -->
+<div id="app" class="hidden">
+  <div class="topbar" id="mainTopbar">
+    <div>
+      <div class="topbar-title" id="topbarTitle">หน้าหลัก</div>
+      <div class="topbar-sub">Tissue Me Chua Lab</div>
+    </div>
+    <div style="display:flex;align-items:center;gap:8px">
+      <div id="notifBell" style="position:relative;cursor:pointer" onclick="showPage('alerts')">
+        <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="var(--text2)" stroke-width="1.7"><path d="M10 2a6 6 0 016 6c0 3 1.5 4 1.5 5H2.5C2.5 12 4 11 4 8a6 6 0 016-6z"/><path d="M8 16a2 2 0 004 0" stroke-linecap="round"/></svg>
+        <div id="notifDot" class="hidden" style="position:absolute;top:0;right:0;width:7px;height:7px;background:var(--danger);border-radius:50%;border:1.5px solid var(--card)"></div>
+      </div>
+      <div id="userAvatar" onclick="showPage('settings')" style="width:30px;height:30px;background:var(--accent-light);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:600;color:var(--accent-text);cursor:pointer"></div>
+    </div>
+  </div>
+  <div class="topbar hidden" id="detailTopbar">
+    <button class="back-btn" style="margin:0" onclick="backFromDetail()">
+      <svg viewBox="0 0 16 16" fill="none" stroke="var(--text2)" stroke-width="1.7" stroke-linecap="round"><path d="M10 3L5 8l5 5"/></svg>
+      <span>รายการ</span>
+    </button>
+    <div id="detailBadgeTop"></div>
+  </div>
+
+  <div class="content">
+    <!-- DASHBOARD -->
+    <div id="page-dashboard" class="page active">
+      <div class="section">
+        <div class="stats-grid" id="statsGrid"></div>
+      </div>
+      <div id="alertsSection" class="section" style="padding-top:0"></div>
+      <div class="section" style="padding-top:0">
+        <div class="section-label">Culture ล่าสุด</div>
+        <div id="recentCultures"></div>
+      </div>
+      <div class="section" style="padding-top:0">
+        <div class="section-label" style="margin-bottom:8px">อุณหภูมิ (7 วันล่าสุด)</div>
+        <div class="chart-container card" style="padding:12px">
+          <canvas id="dashTempChart"></canvas>
+        </div>
+      </div>
+    </div>
+
+    <!-- LIST PAGE -->
+    <div id="page-list" class="page">
+      <div style="padding:12px 0 0">
+        <div class="filter-scroll" id="filterRow"></div>
+        <div class="search-wrap">
+          <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2"><circle cx="7" cy="7" r="5"/><path d="M12 12l2 2" stroke-linecap="round"/></svg>
+          <input class="inp" id="searchInput" type="search" placeholder="ค้นหาชนิดพืช, ID, สูตร..." oninput="renderList()"/>
+        </div>
+        <div id="cultureList" style="padding:0 16px"></div>
+      </div>
+    </div>
+
+    <!-- ADD/EDIT PAGE -->
+    <div id="page-add" class="page">
+      <div class="section">
+        <button class="back-btn" onclick="cancelAdd()">
+          <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M10 3L5 8l5 5"/></svg>
+          ยกเลิก
+        </button>
+        <div style="font-size:16px;font-weight:600;margin-bottom:16px" id="addFormTitle">เพิ่ม Culture ใหม่</div>
+        <div class="form-group">
+          <label class="form-label">ชนิดพืช <span class="form-req">*</span></label>
+          <input class="inp" id="f_plant" type="text" placeholder="เช่น กล้วยไม้แวนด้า"/>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">ชนิด Explant <span class="form-req">*</span></label>
+            <select class="inp" id="f_explant">
+              <option value="">เลือก</option>
+              <option>Shoot Tip</option><option>Node</option><option>Leaf Disk</option>
+              <option>Root</option><option>Axillary Bud</option><option>Callus</option><option>อื่นๆ</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">สูตรอาหาร <span class="form-req">*</span></label>
+            <select class="inp" id="f_formula">
+              <option value="">เลือก</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">วันที่เริ่มเลี้ยง <span class="form-req">*</span></label>
+            <input class="inp" id="f_startdate" type="date"/>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Due Date</label>
+            <input class="inp" id="f_duedate" type="date"/>
+          </div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">ผู้ทำ</label>
+          <input class="inp" id="f_operator" type="text" placeholder="ชื่อผู้ทำการทดลอง"/>
+        </div>
+        <div class="form-group">
+          <label class="form-label">แท็ก</label>
+          <input class="inp" id="f_tags" type="text" placeholder="#ชุดA #ทดลอง (คั่นด้วยเว้นวรรค)"/>
+        </div>
+        <div class="form-group">
+          <label class="form-label">บันทึกเริ่มต้น</label>
+          <textarea class="inp" id="f_note" placeholder="สภาพ explant ตอนเริ่ม, ขนาด, ลักษณะ..."></textarea>
+        </div>
+        <div class="form-group">
+          <label class="form-label">รูปภาพวันแรก</label>
+          <div class="photo-grid" id="addPhotoGrid">
+            <label class="photo-add-btn" for="addPhotoInput">
+              <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="4" width="16" height="13" rx="2"/><circle cx="10" cy="10.5" r="3"/><path d="M7 4V3h6v1" stroke-linecap="round"/></svg>
+              <span>เพิ่มรูป</span>
+            </label>
+            <input type="file" id="addPhotoInput" accept="image/*" multiple class="hidden" onchange="handlePhotoUpload(this,'addPhotos')"/>
+          </div>
+          <div id="addPhotosPreview" style="margin-top:8px"></div>
+        </div>
+        <button class="btn btn-primary" onclick="saveCulture()" style="margin-top:4px">บันทึก Culture</button>
+        <div style="height:8px"></div>
+      </div>
+    </div>
+
+    <!-- DETAIL PAGE -->
+    <div id="page-detail" class="page">
+      <div class="section">
+        <div id="detailContent"></div>
+      </div>
+    </div>
+
+    <!-- TEMP LOG PAGE -->
+    <div id="page-temp" class="page">
+      <div class="section">
+        <div class="section-label" style="margin-bottom:12px">บันทึกอุณหภูมิ</div>
+        <div class="card" style="margin-bottom:14px">
+          <div class="form-row">
+            <div class="form-group" style="margin:0">
+              <label class="form-label">อุณหภูมิ (°C) <span class="form-req">*</span></label>
+              <div class="inp-unit"><input class="inp" id="t_temp" type="number" step="0.1" placeholder="26.5"/><span>°C</span></div>
+            </div>
+            <div class="form-group" style="margin:0">
+              <label class="form-label">ความชื้น (%)</label>
+              <div class="inp-unit"><input class="inp" id="t_humid" type="number" step="1" placeholder="65"/><span>%</span></div>
+            </div>
+          </div>
+          <div class="form-group" style="margin-top:10px;margin-bottom:0">
+            <label class="form-label">วัน-เวลา</label>
+            <input class="inp" id="t_datetime" type="datetime-local"/>
+          </div>
+          <div class="form-group" style="margin-top:10px;margin-bottom:10px">
+            <label class="form-label">หมายเหตุ</label>
+            <input class="inp" id="t_note" type="text" placeholder="เช่น ปรับแอร์, ไฟดับ..."/>
+          </div>
+          <button class="btn btn-primary" onclick="saveTemp()">บันทึกอุณหภูมิ</button>
+        </div>
+        <div class="section-label">กราฟอุณหภูมิ</div>
+        <div class="chart-tabs" id="tempChartTabs">
+          <div class="chart-tab active" onclick="setTempRange(7,this)">7 วัน</div>
+          <div class="chart-tab" onclick="setTempRange(14,this)">14 วัน</div>
+          <div class="chart-tab" onclick="setTempRange(30,this)">30 วัน</div>
+          <div class="chart-tab" onclick="setTempRange(90,this)">90 วัน</div>
+          <div class="chart-tab" onclick="setTempRange(0,this)">ทั้งหมด</div>
+        </div>
+        <div class="card" style="margin-bottom:14px">
+          <div class="chart-container"><canvas id="tempChart"></canvas></div>
+        </div>
+        <div class="section-label">ประวัติล่าสุด</div>
+        <div id="tempHistory"></div>
+      </div>
+    </div>
+
+    <!-- ALERTS -->
+    <div id="page-alerts" class="page">
+      <div class="section">
+        <div class="section-label">การแจ้งเตือน</div>
+        <div id="alertsList"></div>
+      </div>
+    </div>
+
+    <!-- SETTINGS -->
+    <div id="page-settings" class="page">
+      <div class="section">
+        <div class="section-label">บัญชีของฉัน</div>
+        <div class="card" style="margin-bottom:16px">
+          <div style="display:flex;align-items:center;gap:12px">
+            <div id="settingsAvatar" style="width:48px;height:48px;background:var(--accent-light);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:600;color:var(--accent-text)"></div>
+            <div>
+              <div style="font-size:15px;font-weight:600" id="settingsName"></div>
+              <div style="font-size:12px;color:var(--text3)" id="settingsEmail"></div>
+              <span id="settingsRole" class="user-role" style="margin-top:4px"></span>
+            </div>
+          </div>
+        </div>
+        <div id="adminSection" class="hidden">
+          <div class="section-label">อนุมัติผู้ใช้ใหม่</div>
+          <div id="pendingUsers" style="margin-bottom:16px"></div>
+          <div class="section-label">ผู้ใช้ทั้งหมด</div>
+          <div id="allUsers" style="margin-bottom:16px"></div>
+          <div class="section-label">จัดการสูตรอาหาร</div>
+          <div class="card" style="margin-bottom:14px" id="formulaList"></div>
+          <div style="display:flex;gap:8px;margin-bottom:16px">
+            <input class="inp" id="newFormulaName" placeholder="ชื่อสูตร เช่น F6"/>
+            <input class="inp" id="newFormulaDesc" placeholder="รายละเอียด"/>
+            <button class="btn btn-outline btn-sm" onclick="addFormula()">+</button>
+          </div>
+        </div>
+        <div class="section-label">การตั้งค่า</div>
+        <div class="card">
+          <div class="setting-row">
+            <div><div class="setting-label">แจ้งเตือน Due Date</div><div class="setting-sub">แจ้งเตือนล่วงหน้า 3 วัน</div></div>
+            <div class="toggle on" id="toggleNotif" onclick="this.classList.toggle('on')"></div>
+          </div>
+          <div class="setting-row">
+            <div><div class="setting-label">ธีมสว่าง/มืด</div><div class="setting-sub">ขณะนี้: สว่าง</div></div>
+            <div class="toggle" id="toggleDark" onclick="toggleDarkMode(this)"></div>
+          </div>
+        </div>
+        <div style="margin-top:16px">
+          <button class="btn btn-danger" onclick="doLogout()">ออกจากระบบ</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="bottom-nav">
+    <button class="nav-btn active" onclick="showPage('dashboard')" id="nav-dashboard">
+      <svg viewBox="0 0 20 20" fill="none" stroke="currentColor"><rect x="2" y="2" width="7" height="7" rx="1.5"/><rect x="11" y="2" width="7" height="7" rx="1.5"/><rect x="2" y="11" width="7" height="7" rx="1.5"/><rect x="11" y="11" width="7" height="7" rx="1.5"/></svg>
+      หน้าหลัก
+    </button>
+    <button class="nav-btn" onclick="showPage('list')" id="nav-list">
+      <svg viewBox="0 0 20 20" fill="none" stroke="currentColor"><path d="M3 5h14M3 10h14M3 15h10" stroke-linecap="round"/></svg>
+      รายการ
+    </button>
+    <button class="nav-btn" onclick="showPage('temp')" id="nav-temp">
+      <svg viewBox="0 0 20 20" fill="none" stroke="currentColor"><path d="M10 3v8.5" stroke-linecap="round"/><circle cx="10" cy="14" r="3"/><path d="M7 7H5M7 5H5M15 7h-2M15 5h-2" stroke-linecap="round"/></svg>
+      อุณหภูมิ
+    </button>
+    <button class="nav-btn" onclick="showPage('alerts')" id="nav-alerts" style="position:relative">
+      <svg viewBox="0 0 20 20" fill="none" stroke="currentColor"><path d="M10 2a6 6 0 016 6c0 3 1.5 4 1.5 5H2.5C2.5 12 4 11 4 8a6 6 0 016-6z"/><path d="M8 16a2 2 0 004 0" stroke-linecap="round"/></svg>
+      แจ้งเตือน
+    </button>
+    <button class="nav-btn" onclick="showPage('settings')" id="nav-settings">
+      <svg viewBox="0 0 20 20" fill="none" stroke="currentColor"><circle cx="10" cy="10" r="3"/><path d="M10 2v2M10 16v2M2 10h2M16 10h2M4.22 4.22l1.42 1.42M14.36 14.36l1.42 1.42M4.22 15.78l1.42-1.42M14.36 5.64l1.42-1.42"/></svg>
+      ตั้งค่า
+    </button>
+  </div>
+</div>
+
+<!-- UPDATE MODAL -->
+<div class="modal-overlay hidden" id="updateModal">
+  <div class="modal-sheet">
+    <div class="modal-handle"></div>
+    <div class="modal-header">
+      <div class="modal-title">อัพเดตสถานะ</div>
+      <button onclick="closeModal('updateModal')" style="font-size:18px;color:var(--text3)">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group">
+        <label class="form-label">สถานะ <span class="form-req">*</span></label>
+        <select class="inp" id="u_status">
+          <option value="growing_well">โตดี</option>
+          <option value="growing_normal">โตปกติ</option>
+          <option value="growing_slow">โตช้า</option>
+          <option value="contaminated">Contaminated</option>
+          <option value="subcultured">Subcultured (ย้ายขวด)</option>
+        </select>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">จำนวนยอดที่แตก</label>
+          <div class="inp-unit"><input class="inp" id="u_shoots" type="number" min="0" placeholder="0"/><span>ยอด</span></div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">จำนวนราก</label>
+          <div class="inp-unit"><input class="inp" id="u_roots" type="number" min="0" placeholder="0"/><span>ราก</span></div>
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">ความยาวต้น (cm)</label>
+          <div class="inp-unit"><input class="inp" id="u_shootLen" type="number" step="0.1" min="0" placeholder="0.0"/><span>cm</span></div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">ความยาวราก (cm)</label>
+          <div class="inp-unit"><input class="inp" id="u_rootLen" type="number" step="0.1" min="0" placeholder="0.0"/><span>cm</span></div>
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">การเจริญเติบโต</label>
+        <input class="inp" id="u_growth" type="text" placeholder="เช่น ใบสีเขียวเข้ม ไม่มีการปนเปื้อน"/>
+      </div>
+      <div class="form-group">
+        <label class="form-label">หมายเหตุ</label>
+        <textarea class="inp" id="u_note" placeholder="บันทึกเพิ่มเติม..."></textarea>
+      </div>
+      <div class="form-group">
+        <label class="form-label">เพิ่มรูปภาพ</label>
+        <div class="photo-grid" id="updatePhotoGrid">
+          <label class="photo-add-btn" for="updatePhotoInput">
+            <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="4" width="16" height="13" rx="2"/><circle cx="10" cy="10.5" r="3"/></svg>
+            <span>เพิ่มรูป</span>
+          </label>
+          <input type="file" id="updatePhotoInput" accept="image/*" multiple class="hidden" onchange="handlePhotoUpload(this,'updatePhotos')"/>
+        </div>
+        <div id="updatePhotosPreview" style="margin-top:8px"></div>
+      </div>
+      <div id="closeSection">
+        <div style="border-top:1px solid var(--border);padding-top:12px;margin-top:4px">
+          <div style="font-size:12px;color:var(--text2);margin-bottom:8px">วันที่ปิดขวด (ถ้ามี)</div>
+          <input class="inp" id="u_closedate" type="date"/>
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('updateModal')">ยกเลิก</button>
+      <button class="btn btn-primary" onclick="saveUpdate()">บันทึก</button>
+    </div>
+  </div>
+</div>
+
+<!-- LIGHTBOX -->
+<div class="lightbox hidden" id="lightbox" onclick="closeLightbox()">
+  <span class="lightbox-close">✕</span>
+  <img id="lightboxImg" src="" alt=""/>
+</div>
+
+<!-- TOAST -->
+<div id="toast" style="position:fixed;bottom:90px;left:50%;transform:translateX(-50%);background:var(--text);color:var(--bg);padding:10px 20px;border-radius:var(--radius-sm);font-size:13px;z-index:999;opacity:0;transition:opacity .3s;pointer-events:none;white-space:nowrap"></div>
+
+<!-- FAB -->
+<button class="fab hidden" id="mainFab" onclick="showPage('add')">
+  <svg width="22" height="22" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M10 4v12M4 10h12" stroke-linecap="round"/></svg>
+</button>
+
+<script>
+// ──────────────────────────────────────────────
+// DATA STORE (localStorage)
+// ──────────────────────────────────────────────
+const DB = {
+  get(k){try{return JSON.parse(localStorage.getItem('tmc_'+k)||'null')}catch{return null}},
+  set(k,v){localStorage.setItem('tmc_'+k,JSON.stringify(v))},
+  cultures(){return this.get('cultures')||[]},
+  saveCultures(d){this.set('cultures',d)},
+  temps(){return this.get('temps')||[]},
+  saveTemps(d){this.set('temps',d)},
+  users(){return this.get('users')||[
+    {id:'SUPERADMIN',name:'สาธิต ฉัตรพันธุ์',email:'Satit.c@psru.ac.th',pass:'254102',role:'admin',approved:true,avatar:'ส',superadmin:true}
+  ]},
+  saveUsers(d){this.set('users',d)},
+  formulas(){return this.get('formulas')||[
+    {id:'f1',name:'F1',desc:'MS + BAP 1mg/L'},
+    {id:'f2',name:'F2',desc:'MS + NAA 0.5mg/L'},
+    {id:'f3',name:'F3',desc:'WPM + Kinetin 2mg/L'},
+    {id:'f4',name:'F4',desc:'MS + 2,4-D 1mg/L'},
+    {id:'f5',name:'F5',desc:'MS เต็มสูตร'}
+  ]},
+  saveFormulas(d){this.set('formulas',d)}
+};
+
+// Seed demo data
+function seedDemo(){
+  if(DB.cultures().length>0)return;
+  const today=new Date();
+  function daysAgo(n){const d=new Date(today);d.setDate(d.getDate()-n);return d.toISOString().split('T')[0]}
+  function daysFwd(n){const d=new Date(today);d.setDate(d.getDate()+n);return d.toISOString().split('T')[0]}
+  const cultures=[
+    {id:'TMC-001',plant:'กล้วยไม้แวนด้า',explant:'Shoot Tip',formula:'F3',startDate:daysAgo(14),dueDate:daysFwd(16),operator:'นิภา',tags:['#ทดลอง','#ชุดA'],note:'Explant ขนาด 1.5cm',status:'growing_well',closedDate:null,updates:[{date:daysAgo(7)+'T10:30',status:'growing_normal',shoots:1,roots:0,shootLen:0.8,rootLen:0,growth:'เริ่มแตกยอดเล็กน้อย',note:'',photos:[]},{date:daysAgo(0)+'T09:00',status:'growing_well',shoots:3,roots:2,shootLen:2.1,rootLen:0.5,growth:'ยอดแตกดี รากเริ่มออก',note:'',photos:[]}],photos:[]},
+    {id:'TMC-002',plant:'กุหลาบ',explant:'Node',formula:'F1',startDate:daysAgo(22),dueDate:daysFwd(8),operator:'ธนา',tags:['#ชุดA'],note:'',status:'growing_slow',closedDate:null,updates:[{date:daysAgo(10)+'T14:00',status:'growing_slow',shoots:1,roots:1,shootLen:0.5,rootLen:0.3,growth:'โตช้ากว่าที่คาดไว้',note:'อาจเพิ่ม BAP',photos:[]}],photos:[]},
+    {id:'TMC-003',plant:'มะเขือเทศ Cherry',explant:'Leaf Disk',formula:'F2',startDate:daysAgo(18),dueDate:daysFwd(12),operator:'นิภา',tags:['#ทดลอง'],note:'',status:'contaminated',closedDate:daysAgo(4),updates:[{date:daysAgo(4)+'T08:00',status:'contaminated',shoots:0,roots:0,shootLen:0,rootLen:0,growth:'พบเชื้อรา สีดำ ที่ขอบวุ้น',note:'ทิ้งขวด',photos:[]}],photos:[]},
+    {id:'TMC-004',plant:'มะเดื่อ',explant:'Axillary Bud',formula:'F2',startDate:daysAgo(8),dueDate:daysFwd(22),operator:'นิภา',tags:[],note:'',status:'growing_normal',closedDate:null,updates:[],photos:[]},
+  ];
+  DB.saveCultures(cultures);
+
+  // Seed temp data
+  const temps=[];
+  for(let i=30;i>=0;i--){
+    const d=new Date(today);d.setDate(d.getDate()-i);
+    const base=26+Math.sin(i*0.3)*2;
+    temps.push({id:'t'+i,datetime:d.toISOString().slice(0,16),temp:parseFloat((base+Math.random()*1.5-0.7).toFixed(1)),humidity:Math.round(60+Math.random()*15),note:''});
+  }
+  DB.saveTemps(temps);
+}
+
+// ──────────────────────────────────────────────
+// STATE
+// ──────────────────────────────────────────────
+let currentUser=null;
+let currentFilter='all';
+let currentDetailId=null;
+let currentPage='dashboard';
+let editMode=false;
+let tempRange=7;
+let tempChartInstance=null;
+let dashTempChartInstance=null;
+let pendingPhotosAdd=[];
+let pendingPhotosUpdate=[];
+
+// ──────────────────────────────────────────────
+// AUTH
+// ──────────────────────────────────────────────
+function switchAuthTab(tab){
+  document.querySelectorAll('.tab-btn').forEach((b,i)=>b.classList.toggle('active',i===(tab==='login'?0:1)));
+  document.getElementById('loginForm').classList.toggle('hidden',tab!=='login');
+  document.getElementById('registerForm').classList.toggle('hidden',tab!=='register');
+}
+function doLogin(){
+  const email=document.getElementById('loginEmail').value.trim();
+  const pass=document.getElementById('loginPass').value;
+  const users=DB.users();
+  const user=users.find(u=>u.email===email&&u.pass===pass);
+  const err=document.getElementById('loginError');
+  if(!user){err.textContent='อีเมลหรือรหัสผ่านไม่ถูกต้อง';err.style.display='block';return}
+  if(!user.approved){err.textContent='บัญชียังรอการอนุมัติจาก Admin';err.style.display='block';return}
+  err.style.display='none';
+  currentUser=user;
+  document.getElementById('login-page').classList.add('hidden');
+  document.getElementById('app').classList.remove('hidden');
+  document.getElementById('userAvatar').textContent=user.avatar||user.name[0];
+  document.getElementById('mainFab').classList.remove('hidden');
+  initApp();
+}
+function doRegister(){
+  const name=document.getElementById('regName').value.trim();
+  const email=document.getElementById('regEmail').value.trim();
+  const pass=document.getElementById('regPass').value;
+  const err=document.getElementById('regError');
+  if(!name||!email||!pass){err.textContent='กรุณากรอกข้อมูลให้ครบ';err.style.display='block';return}
+  if(pass.length<6){err.textContent='รหัสผ่านต้องมีอย่างน้อย 6 ตัวอักษร';err.style.display='block';return}
+  const users=DB.users();
+  if(users.find(u=>u.email===email)){err.textContent='อีเมลนี้ถูกใช้งานแล้ว';err.style.display='block';return}
+  users.push({id:'u'+Date.now(),name,email,pass,role:'user',approved:false,avatar:name[0]});
+  DB.saveUsers(users);
+  err.style.display='none';
+  showToast('ส่งคำขอลงทะเบียนแล้ว รอ Admin อนุมัติ');
+  switchAuthTab('login');
+}
+function doLogout(){
+  currentUser=null;
+  document.getElementById('app').classList.add('hidden');
+  document.getElementById('login-page').classList.remove('hidden');
+  document.getElementById('loginEmail').value='';
+  document.getElementById('loginPass').value='';
+}
+
+// ──────────────────────────────────────────────
+// INIT
+// ──────────────────────────────────────────────
+function initApp(){
+  seedDemo();
+  populateFormulaSelect();
+  setDefaultDates();
+  showPage('dashboard');
+  renderSettings();
+}
+
+function setDefaultDates(){
+  const today=new Date().toISOString().split('T')[0];
+  const due=new Date();due.setDate(due.getDate()+30);
+  document.getElementById('f_startdate').value=today;
+  document.getElementById('f_duedate').value=due.toISOString().split('T')[0];
+  const dt=new Date().toISOString().slice(0,16);
+  document.getElementById('t_datetime').value=dt;
+}
+
+function populateFormulaSelect(){
+  const sel=document.getElementById('f_formula');
+  sel.innerHTML='<option value="">เลือก</option>';
+  DB.formulas().forEach(f=>{sel.innerHTML+=`<option value="${f.name}">${f.name} — ${f.desc}</option>`});
+}
+
+// ──────────────────────────────────────────────
+// NAVIGATION
+// ──────────────────────────────────────────────
+function showPage(name){
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.nav-btn').forEach(b=>b.classList.remove('active'));
+  const p=document.getElementById('page-'+name);
+  if(p)p.classList.add('active');
+  const nb=document.getElementById('nav-'+name);
+  if(nb)nb.classList.add('active');
+  currentPage=name;
+  document.getElementById('mainTopbar').classList.remove('hidden');
+  document.getElementById('detailTopbar').classList.add('hidden');
+  const titles={dashboard:'หน้าหลัก',list:'รายการ Culture',add:editMode?'แก้ไข Culture':'เพิ่ม Culture',temp:'อุณหภูมิ',alerts:'การแจ้งเตือน',settings:'ตั้งค่า',detail:''};
+  document.getElementById('topbarTitle').textContent=titles[name]||'';
+  const fab=document.getElementById('mainFab');
+  fab.classList.toggle('hidden',name!=='list');
+
+  if(name==='dashboard')renderDashboard();
+  if(name==='list'){renderFilters();renderList();}
+  if(name==='temp'){renderTempHistory();renderTempChart();}
+  if(name==='alerts')renderAlerts();
+  if(name==='settings')renderSettings();
+  if(name==='add'){if(!editMode){resetAddForm();}populateFormulaSelect();}
+}
+
+function backFromDetail(){
+  showPage('list');
+}
+function cancelAdd(){
+  editMode=false;
+  showPage('list');
+}
+
+// ──────────────────────────────────────────────
+// DASHBOARD
+// ──────────────────────────────────────────────
+function renderDashboard(){
+  const cultures=DB.cultures();
+  const active=cultures.filter(c=>!c.closedDate);
+  const cont=cultures.filter(c=>c.status==='contaminated');
+  const today=new Date();
+  const due=active.filter(c=>{
+    if(!c.dueDate)return false;
+    const d=new Date(c.dueDate);
+    return (d-today)/(86400000)<=3 && (d-today)/(86400000)>=0;
+  });
+  document.getElementById('statsGrid').innerHTML=`
+    <div class="stat-card"><div class="stat-num stat-accent">${cultures.length}</div><div class="stat-label">ทั้งหมด</div></div>
+    <div class="stat-card"><div class="stat-num">${active.length}</div><div class="stat-label">กำลังเลี้ยง</div></div>
+    <div class="stat-card"><div class="stat-num stat-danger">${cont.length}</div><div class="stat-label">Contaminated</div></div>
+    <div class="stat-card"><div class="stat-num stat-warn">${due.length}</div><div class="stat-label">ใกล้ Due</div></div>`;
+
+  let alertsHtml='';
+  due.forEach(c=>{
+    const days=Math.ceil((new Date(c.dueDate)-today)/86400000);
+    alertsHtml+=`<div class="alert alert-warn"><svg class="alert-icon" viewBox="0 0 18 18" fill="none" stroke="var(--warn)" stroke-width="1.7"><circle cx="9" cy="9" r="7"/><path d="M9 5v5M9 13v.01" stroke-linecap="round"/></svg><div><div class="alert-title">${c.id} ใกล้ Due (${days} วัน)</div><div class="alert-body">${c.plant} · ${c.formula}</div></div></div>`;
+  });
+  document.getElementById('alertsSection').innerHTML=alertsHtml?`<div>${alertsHtml}</div>`:'';
+
+  const recent=cultures.slice(-4).reverse();
+  document.getElementById('recentCultures').innerHTML=recent.map(c=>cultureCardHTML(c)).join('');
+
+  renderDashTempChart();
+}
+
+// ──────────────────────────────────────────────
+// CULTURE LIST
+// ──────────────────────────────────────────────
+function renderFilters(){
+  const cultures=DB.cultures();
+  const counts={
+    all:cultures.length,
+    growing_well:cultures.filter(c=>c.status==='growing_well').length,
+    growing_normal:cultures.filter(c=>c.status==='growing_normal').length,
+    growing_slow:cultures.filter(c=>c.status==='growing_slow').length,
+    contaminated:cultures.filter(c=>c.status==='contaminated').length,
+    subcultured:cultures.filter(c=>c.status==='subcultured').length,
+    closed:cultures.filter(c=>c.closedDate).length
+  };
+  const labels={all:'ทั้งหมด',growing_well:'โตดี',growing_normal:'โตปกติ',growing_slow:'โตช้า',contaminated:'Contaminated',subcultured:'Subcultured',closed:'ปิดแล้ว'};
+  document.getElementById('filterRow').innerHTML=Object.entries(counts).filter(([k,v])=>v>0||k==='all').map(([k,v])=>`<div class="chip ${currentFilter===k?'active':''}" onclick="setFilter('${k}')">${labels[k]} (${v})</div>`).join('');
+}
+
+function setFilter(f){currentFilter=f;renderFilters();renderList();}
+
+function renderList(){
+  const q=(document.getElementById('searchInput').value||'').toLowerCase();
+  let cultures=DB.cultures();
+  if(currentFilter!=='all'){
+    if(currentFilter==='closed')cultures=cultures.filter(c=>c.closedDate);
+    else cultures=cultures.filter(c=>c.status===currentFilter);
+  }
+  if(q)cultures=cultures.filter(c=>(c.plant+c.id+c.formula+c.operator+(c.tags||[]).join('')).toLowerCase().includes(q));
+  cultures=cultures.slice().reverse();
+  if(!cultures.length){
+    document.getElementById('cultureList').innerHTML=`<div class="empty"><div class="empty-icon">🌱</div><div class="empty-text">ไม่พบ Culture</div></div>`;
+    return;
+  }
+  document.getElementById('cultureList').innerHTML=cultures.map(c=>cultureCardHTML(c)).join('');
+}
+
+function cultureCardHTML(c){
+  const today=new Date();
+  const start=new Date(c.startDate);
+  const end=c.closedDate?new Date(c.closedDate):today;
+  const days=Math.floor((end-start)/86400000);
+  const dueDate=c.dueDate?new Date(c.dueDate):null;
+  let prog=0;
+  if(dueDate){const total=(new Date(c.dueDate)-start)/86400000;prog=Math.min(100,Math.round((days/total)*100));}
+  const progClass=prog>90?'danger':prog>70?'warn':'';
+  const statusLabel={'growing_well':'โตดี','growing_normal':'โตปกติ','growing_slow':'โตช้า','contaminated':'Contaminated','subcultured':'Subcultured'}[c.status]||c.status;
+  const badgeClass={'growing_well':'b-good','growing_normal':'b-norm','growing_slow':'b-slow','contaminated':'b-cont','subcultured':'b-sub'}[c.status]||'b-close';
+  const lastUpdate=c.updates&&c.updates.length?c.updates[c.updates.length-1]:null;
+  return `<div class="culture-card" onclick="showDetail('${c.id}')">
+    <div class="cc-header">
+      <div>
+        <div class="cc-id">${c.id}</div>
+        <div class="cc-name">${c.plant}</div>
+        <div class="cc-meta">${c.explant} · ${c.formula}${c.operator?' · '+c.operator:''}</div>
+      </div>
+      <span class="badge ${badgeClass}">${statusLabel}</span>
+    </div>
+    <div class="cc-footer">
+      <span class="duration-chip">${c.closedDate?'ปิดแล้ว ':''} ${days} วัน</span>
+      <span style="font-size:11px;color:var(--text3)">${lastUpdate?'อัพเดต '+formatRelDate(lastUpdate.date):'เริ่ม '+formatDate(c.startDate)}</span>
+    </div>
+    ${dueDate&&!c.closedDate?`<div class="prog"><div class="prog-fill ${progClass}" style="width:${prog}%"></div></div>`:''}
+  </div>`;
+}
+
+// ──────────────────────────────────────────────
+// DETAIL
+// ──────────────────────────────────────────────
+function showDetail(id){
+  currentDetailId=id;
+  const c=DB.cultures().find(x=>x.id===id);
+  if(!c)return;
+  document.getElementById('mainTopbar').classList.add('hidden');
+  document.getElementById('detailTopbar').classList.remove('hidden');
+  const statusLabel={'growing_well':'โตดี','growing_normal':'โตปกติ','growing_slow':'โตช้า','contaminated':'Contaminated','subcultured':'Subcultured'}[c.status]||c.status;
+  const badgeClass={'growing_well':'b-good','growing_normal':'b-norm','growing_slow':'b-slow','contaminated':'b-cont','subcultured':'b-sub'}[c.status]||'b-close';
+  document.getElementById('detailBadgeTop').innerHTML=`<span class="badge ${badgeClass}">${statusLabel}</span>`;
+
+  const today=new Date();
+  const start=new Date(c.startDate);
+  const end=c.closedDate?new Date(c.closedDate):today;
+  const days=Math.floor((end-start)/86400000);
+  const lastU=c.updates&&c.updates.length?c.updates[c.updates.length-1]:null;
+
+  // Photos
+  const allPhotos=[...(c.photos||[]),...(c.updates||[]).flatMap(u=>(u.photos||[]).map(p=>({...p,updateDate:u.date})))];
+  const photosHtml=allPhotos.length?`<div class="photo-grid">${allPhotos.map(p=>`<div class="photo-thumb" onclick="openLightbox('${p.data}')"><img src="${p.data}" loading="lazy"/><div class="photo-date">${formatDateShort(p.date||p.updateDate)}</div></div>`).join('')}</div>`:'<div style="color:var(--text3);font-size:12px">ยังไม่มีรูปภาพ</div>';
+
+  // Growth chart
+  const growthData=c.updates&&c.updates.length?c.updates.filter(u=>u.shootLen>0||u.rootLen>0):[];
+
+  let html=`
+    <div style="margin-bottom:16px">
+      <div style="font-size:11px;font-family:'DM Mono',monospace;color:var(--text3);margin-bottom:4px">${c.id}</div>
+      <div style="font-size:20px;font-weight:700;color:var(--text);margin-bottom:8px">${c.plant}</div>
+      <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px">
+        <span class="badge b-norm">${c.explant}</span>
+        <span style="background:var(--purple-light);color:#4c1d95" class="badge">${c.formula}</span>
+        ${(c.tags||[]).map(t=>`<span style="background:var(--bg2);color:var(--text2)" class="badge">${t}</span>`).join('')}
+      </div>
+    </div>
+    <div class="card" style="margin-bottom:12px">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+        <div><div style="font-size:10px;color:var(--text3);margin-bottom:2px">เริ่มเลี้ยง</div><div style="font-size:13px;font-weight:500">${formatDate(c.startDate)}</div></div>
+        <div><div style="font-size:10px;color:var(--text3);margin-bottom:2px">Duration</div><div style="font-size:13px;font-weight:500;color:var(--accent)">${days} วัน</div></div>
+        <div><div style="font-size:10px;color:var(--text3);margin-bottom:2px">Due Date</div><div style="font-size:13px;font-weight:500">${c.dueDate?formatDate(c.dueDate):'—'}</div></div>
+        <div><div style="font-size:10px;color:var(--text3);margin-bottom:2px">ผู้ทำ</div><div style="font-size:13px;font-weight:500">${c.operator||'—'}</div></div>
+        ${c.closedDate?`<div style="grid-column:span 2"><div style="font-size:10px;color:var(--text3);margin-bottom:2px">วันที่ปิด</div><div style="font-size:13px;font-weight:500;color:var(--danger)">${formatDate(c.closedDate)}</div></div>`:''}
+        ${lastU&&lastU.shoots!==undefined?`<div><div style="font-size:10px;color:var(--text3);margin-bottom:2px">ยอด (ล่าสุด)</div><div style="font-size:13px;font-weight:500">${lastU.shoots} ยอด</div></div>`:''}
+        ${lastU&&lastU.roots!==undefined?`<div><div style="font-size:10px;color:var(--text3);margin-bottom:2px">ราก (ล่าสุด)</div><div style="font-size:13px;font-weight:500">${lastU.roots} ราก</div></div>`:''}
+      </div>
+      ${c.note?`<div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--border);font-size:12px;color:var(--text2)">${c.note}</div>`:''}
+    </div>`;
+
+  if(growthData.length>1){
+    html+=`<div class="section-label">กราฟการเจริญเติบโต</div>
+    <div class="card" style="margin-bottom:12px"><div class="chart-container"><canvas id="growthChart"></canvas></div></div>`;
+  }
+
+  html+=`<div class="section-label" style="margin-bottom:10px">รูปภาพ</div>
+    <div style="margin-bottom:16px">${photosHtml}</div>
+    <div class="section-label" style="margin-bottom:10px">ประวัติอัพเดต</div>`;
+
+  if(c.updates&&c.updates.length){
+    html+=`<div class="timeline">`;
+    [...c.updates].reverse().forEach(u=>{
+      const sl={'growing_well':'โตดี','growing_normal':'โตปกติ','growing_slow':'โตช้า','contaminated':'Contaminated','subcultured':'Subcultured'}[u.status]||u.status;
+      const bc={'growing_well':'b-good','growing_normal':'b-norm','growing_slow':'b-slow','contaminated':'b-cont','subcultured':'b-sub'}[u.status]||'b-close';
+      let measurements='';
+      if(u.shoots!==undefined&&u.shoots!==null&&u.shoots!==''){measurements+=` · ${u.shoots} ยอด`}
+      if(u.roots!==undefined&&u.roots!==null&&u.roots!==''){measurements+=` · ${u.roots} ราก`}
+      if(u.shootLen){measurements+=` · ต้น ${u.shootLen}cm`}
+      if(u.rootLen){measurements+=` · ราก ${u.rootLen}cm`}
+      const uPhotos=(u.photos||[]);
+      html+=`<div class="tl-item">
+        <div class="tl-dot"></div>
+        <div class="tl-date">${formatDateTime(u.date)}</div>
+        <div class="tl-text"><span class="badge ${bc}" style="font-size:10px;padding:2px 6px">${sl}</span>${measurements}</div>
+        ${u.growth?`<div class="tl-sub">${u.growth}</div>`:''}
+        ${u.note?`<div class="tl-sub" style="color:var(--text3)">${u.note}</div>`:''}
+        ${uPhotos.length?`<div class="photo-grid" style="margin-top:6px">${uPhotos.map(p=>`<div class="photo-thumb" onclick="openLightbox('${p.data}')"><img src="${p.data}" loading="lazy"/></div>`).join('')}</div>`:''}
+      </div>`;
+    });
+    html+=`</div>`;
+  } else {
+    html+=`<div style="font-size:12px;color:var(--text3)">ยังไม่มีประวัติอัพเดต</div>`;
+  }
+
+  const isAdmin=currentUser&&currentUser.role==='admin';
+  html+=`<div style="margin-top:16px;display:flex;flex-direction:column;gap:8px">
+    <button class="btn btn-primary" onclick="openUpdateModal('${c.id}')">อัพเดตสถานะ</button>
+    ${isAdmin?`<button class="btn btn-secondary" onclick="editCulture('${c.id}')">แก้ไขข้อมูล</button>
+    <button class="btn btn-danger" onclick="deleteCulture('${c.id}')">ลบ Culture นี้</button>`:''}
+  </div>`;
+
+  document.getElementById('detailContent').innerHTML=html;
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+  document.getElementById('page-detail').classList.add('active');
+  currentPage='detail';
+
+  if(growthData.length>1){
+    setTimeout(()=>{
+      const ctx=document.getElementById('growthChart');
+      if(ctx){
+        new Chart(ctx,{type:'line',data:{labels:growthData.map(u=>formatDateShort(u.date)),datasets:[
+          {label:'ความยาวต้น (cm)',data:growthData.map(u=>u.shootLen||0),borderColor:'#40916c',backgroundColor:'rgba(64,145,108,.1)',tension:.3,fill:true,pointRadius:4},
+          {label:'ความยาวราก (cm)',data:growthData.map(u=>u.rootLen||0),borderColor:'#b45309',backgroundColor:'rgba(180,83,9,.1)',tension:.3,fill:true,pointRadius:4}
+        ]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{labels:{font:{size:11},boxWidth:12}}},scales:{y:{beginAtZero:true,ticks:{font:{size:10}}},x:{ticks:{font:{size:10}}}}}});
+      }
+    },100);
+  }
+}
+
+// ──────────────────────────────────────────────
+// ADD / EDIT CULTURE
+// ──────────────────────────────────────────────
+function resetAddForm(){
+  ['f_plant','f_explant','f_formula','f_operator','f_tags','f_note'].forEach(id=>{document.getElementById(id).value='';});
+  setDefaultDates();
+  pendingPhotosAdd=[];
+  document.getElementById('addPhotosPreview').innerHTML='';
+  document.getElementById('addFormTitle').textContent='เพิ่ม Culture ใหม่';
+}
+
+function editCulture(id){
+  const c=DB.cultures().find(x=>x.id===id);
+  if(!c)return;
+  editMode=true;
+  currentDetailId=id;
+  showPage('add');
+  document.getElementById('addFormTitle').textContent='แก้ไข Culture';
+  document.getElementById('f_plant').value=c.plant;
+  document.getElementById('f_explant').value=c.explant;
+  document.getElementById('f_startdate').value=c.startDate;
+  document.getElementById('f_duedate').value=c.dueDate||'';
+  document.getElementById('f_operator').value=c.operator||'';
+  document.getElementById('f_tags').value=(c.tags||[]).join(' ');
+  document.getElementById('f_note').value=c.note||'';
+  setTimeout(()=>{ document.getElementById('f_formula').value=c.formula; },50);
+}
+
+function saveCulture(){
+  const plant=document.getElementById('f_plant').value.trim();
+  const explant=document.getElementById('f_explant').value;
+  const formula=document.getElementById('f_formula').value;
+  const startDate=document.getElementById('f_startdate').value;
+  if(!plant||!explant||!formula||!startDate){showToast('กรุณากรอกข้อมูลที่จำเป็น');return;}
+  const cultures=DB.cultures();
+  if(editMode&&currentDetailId){
+    const idx=cultures.findIndex(c=>c.id===currentDetailId);
+    if(idx>-1){
+      cultures[idx]={...cultures[idx],plant,explant,formula,startDate,dueDate:document.getElementById('f_duedate').value||null,operator:document.getElementById('f_operator').value.trim(),tags:document.getElementById('f_tags').value.trim().split(/\s+/).filter(Boolean),note:document.getElementById('f_note').value.trim()};
+      if(pendingPhotosAdd.length)cultures[idx].photos=[...(cultures[idx].photos||[]),...pendingPhotosAdd];
+    }
+    DB.saveCultures(cultures);
+    editMode=false;
+    showToast('แก้ไขสำเร็จ');
+    showDetail(currentDetailId);
+  } else {
+    const id='TMC-'+String(cultures.length+1).padStart(3,'0');
+    const newC={id,plant,explant,formula,startDate,dueDate:document.getElementById('f_duedate').value||null,operator:document.getElementById('f_operator').value.trim(),tags:document.getElementById('f_tags').value.trim().split(/\s+/).filter(Boolean),note:document.getElementById('f_note').value.trim(),status:'growing_normal',closedDate:null,updates:[],photos:pendingPhotosAdd.slice()};
+    cultures.push(newC);
+    DB.saveCultures(cultures);
+    pendingPhotosAdd=[];
+    showToast('บันทึก Culture '+id+' สำเร็จ');
+    showPage('list');
+  }
+}
+
+function deleteCulture(id){
+  if(!confirm('ลบ Culture '+id+' ใช่ไหม?'))return;
+  const cultures=DB.cultures().filter(c=>c.id!==id);
+  DB.saveCultures(cultures);
+  showToast('ลบแล้ว');
+  showPage('list');
+}
+
+// ──────────────────────────────────────────────
+// UPDATE MODAL
+// ──────────────────────────────────────────────
+function openUpdateModal(id){
+  currentDetailId=id;
+  const c=DB.cultures().find(x=>x.id===id);
+  if(c){document.getElementById('u_status').value=c.status||'growing_normal';}
+  ['u_shoots','u_roots','u_shootLen','u_rootLen','u_growth','u_note','u_closedate'].forEach(id=>document.getElementById(id).value='');
+  pendingPhotosUpdate=[];
+  document.getElementById('updatePhotosPreview').innerHTML='';
+  document.getElementById('updateModal').classList.remove('hidden');
+}
+
+function saveUpdate(){
+  const id=currentDetailId;
+  const cultures=DB.cultures();
+  const idx=cultures.findIndex(c=>c.id===id);
+  if(idx<0)return;
+  const status=document.getElementById('u_status').value;
+  const update={
+    date:new Date().toISOString().slice(0,16),
+    status,
+    shoots:document.getElementById('u_shoots').value!==''?parseFloat(document.getElementById('u_shoots').value):null,
+    roots:document.getElementById('u_roots').value!==''?parseFloat(document.getElementById('u_roots').value):null,
+    shootLen:document.getElementById('u_shootLen').value!==''?parseFloat(document.getElementById('u_shootLen').value):null,
+    rootLen:document.getElementById('u_rootLen').value!==''?parseFloat(document.getElementById('u_rootLen').value):null,
+    growth:document.getElementById('u_growth').value.trim(),
+    note:document.getElementById('u_note').value.trim(),
+    photos:pendingPhotosUpdate.slice()
+  };
+  if(!cultures[idx].updates)cultures[idx].updates=[];
+  cultures[idx].updates.push(update);
+  cultures[idx].status=status;
+  const closeDate=document.getElementById('u_closedate').value;
+  if(closeDate)cultures[idx].closedDate=closeDate;
+  DB.saveCultures(cultures);
+  closeModal('updateModal');
+  pendingPhotosUpdate=[];
+  showToast('อัพเดตสำเร็จ');
+  showDetail(id);
+}
+
+function closeModal(id){document.getElementById(id).classList.add('hidden');}
+
+// ──────────────────────────────────────────────
+// PHOTOS
+// ──────────────────────────────────────────────
+function handlePhotoUpload(input,target){
+  const files=Array.from(input.files);
+  files.forEach(file=>{
+    const reader=new FileReader();
+    reader.onload=e=>{
+      const photo={data:e.target.result,date:new Date().toISOString().slice(0,10)};
+      if(target==='addPhotos'){
+        pendingPhotosAdd.push(photo);
+        renderPendingPhotos('addPhotosPreview',pendingPhotosAdd);
+      } else {
+        pendingPhotosUpdate.push(photo);
+        renderPendingPhotos('updatePhotosPreview',pendingPhotosUpdate);
+      }
+    };
+    reader.readAsDataURL(file);
+  });
+  input.value='';
+}
+
+function renderPendingPhotos(containerId,photos){
+  document.getElementById(containerId).innerHTML=`<div class="photo-grid">${photos.map((p,i)=>`<div class="photo-thumb"><img src="${p.data}"/><div class="photo-date">${p.date}</div></div>`).join('')}</div>`;
+}
+
+function openLightbox(src){
+  document.getElementById('lightboxImg').src=src;
+  document.getElementById('lightbox').classList.remove('hidden');
+}
+function closeLightbox(){document.getElementById('lightbox').classList.add('hidden');}
+
+// ──────────────────────────────────────────────
+// TEMPERATURE
+// ──────────────────────────────────────────────
+function saveTemp(){
+  const temp=parseFloat(document.getElementById('t_temp').value);
+  const humid=document.getElementById('t_humid').value?parseFloat(document.getElementById('t_humid').value):null;
+  const datetime=document.getElementById('t_datetime').value;
+  const note=document.getElementById('t_note').value.trim();
+  if(!datetime||isNaN(temp)){showToast('กรุณากรอกวัน-เวลาและอุณหภูมิ');return;}
+  const temps=DB.temps();
+  temps.push({id:'t'+Date.now(),datetime,temp,humidity:humid,note});
+  DB.saveTemps(temps);
+  document.getElementById('t_temp').value='';
+  document.getElementById('t_humid').value='';
+  document.getElementById('t_note').value='';
+  showToast('บันทึกอุณหภูมิสำเร็จ');
+  renderTempHistory();
+  renderTempChart();
+}
+
+function setTempRange(days,el){
+  tempRange=days;
+  document.querySelectorAll('.chart-tab').forEach(t=>t.classList.remove('active'));
+  el.classList.add('active');
+  renderTempChart();
+}
+
+function getFilteredTemps(){
+  const temps=DB.temps().sort((a,b)=>a.datetime.localeCompare(b.datetime));
+  if(tempRange===0)return temps;
+  const cutoff=new Date();cutoff.setDate(cutoff.getDate()-tempRange);
+  return temps.filter(t=>new Date(t.datetime)>=cutoff);
+}
+
+function renderTempChart(){
+  const data=getFilteredTemps();
+  const ctx=document.getElementById('tempChart');
+  if(!ctx)return;
+  if(tempChartInstance)tempChartInstance.destroy();
+  tempChartInstance=new Chart(ctx,{
+    type:'line',
+    data:{
+      labels:data.map(t=>formatDateShort(t.datetime)),
+      datasets:[
+        {label:'อุณหภูมิ (°C)',data:data.map(t=>t.temp),borderColor:'#e67e22',backgroundColor:'rgba(230,126,34,.1)',tension:.3,fill:true,yAxisID:'y',pointRadius:3},
+        {label:'ความชื้น (%)',data:data.map(t=>t.humidity),borderColor:'#2980b9',backgroundColor:'rgba(41,128,185,.1)',tension:.3,fill:false,yAxisID:'y1',pointRadius:3}
+      ]
+    },
+    options:{responsive:true,maintainAspectRatio:false,interaction:{mode:'index',intersect:false},plugins:{legend:{labels:{font:{size:11},boxWidth:12}}},scales:{
+      y:{type:'linear',position:'left',title:{display:true,text:'°C',font:{size:10}},ticks:{font:{size:10}}},
+      y1:{type:'linear',position:'right',title:{display:true,text:'%',font:{size:10}},ticks:{font:{size:10}},grid:{drawOnChartArea:false}},
+      x:{ticks:{font:{size:9},maxRotation:45}}
+    }}
+  });
+}
+
+function renderDashTempChart(){
+  const data=DB.temps().sort((a,b)=>a.datetime.localeCompare(b.datetime)).slice(-14);
+  const ctx=document.getElementById('dashTempChart');
+  if(!ctx)return;
+  if(dashTempChartInstance)dashTempChartInstance.destroy();
+  dashTempChartInstance=new Chart(ctx,{
+    type:'line',
+    data:{labels:data.map(t=>formatDateShort(t.datetime)),datasets:[{label:'°C',data:data.map(t=>t.temp),borderColor:'#e67e22',backgroundColor:'rgba(230,126,34,.1)',tension:.3,fill:true,pointRadius:2}]},
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{y:{ticks:{font:{size:10}}},x:{ticks:{font:{size:9},maxRotation:45}}}}
+  });
+}
+
+function renderTempHistory(){
+  const temps=getFilteredTemps().slice().reverse().slice(0,20);
+  const el=document.getElementById('tempHistory');
+  if(!el)return;
+  if(!temps.length){el.innerHTML='<div class="empty"><div class="empty-text">ยังไม่มีข้อมูลอุณหภูมิ</div></div>';return;}
+  el.innerHTML=temps.map(t=>`<div class="card" style="margin-bottom:8px;display:flex;justify-content:space-between;align-items:center">
+    <div>
+      <div style="font-size:13px;font-weight:500;color:var(--text)">${t.temp}°C ${t.humidity?'· '+t.humidity+'%':''}</div>
+      <div style="font-size:11px;color:var(--text3)">${formatDateTime(t.datetime)}${t.note?' · '+t.note:''}</div>
+    </div>
+    <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="var(--text3)" stroke-width="1.5"><path d="M7 2v6" stroke-linecap="round"/><circle cx="7" cy="10" r="2.5" fill="rgba(230,126,34,.2)" stroke="var(--warn)"/></svg>
+  </div>`).join('');
+}
+
+// ──────────────────────────────────────────────
+// ALERTS
+// ──────────────────────────────────────────────
+function renderAlerts(){
+  const cultures=DB.cultures();
+  const today=new Date();
+  let html='';
+  cultures.filter(c=>!c.closedDate&&c.dueDate).forEach(c=>{
+    const d=(new Date(c.dueDate)-today)/86400000;
+    if(d<=3&&d>=0){
+      const days=Math.ceil(d);
+      html+=`<div class="alert alert-warn"><svg class="alert-icon" viewBox="0 0 18 18" fill="none" stroke="var(--warn)" stroke-width="1.7"><circle cx="9" cy="9" r="7"/><path d="M9 5v5M9 13v.01" stroke-linecap="round"/></svg><div><div class="alert-title">${c.id} — ${c.plant}</div><div class="alert-body">ครบ Due ใน ${days} วัน (${formatDate(c.dueDate)})</div></div></div>`;
+    }
+    if(d<0){
+      html+=`<div class="alert alert-danger"><svg class="alert-icon" viewBox="0 0 18 18" fill="none" stroke="var(--danger)" stroke-width="1.7"><circle cx="9" cy="9" r="7"/><path d="M6 6l6 6M12 6l-6 6" stroke-linecap="round"/></svg><div><div class="alert-title">${c.id} — ${c.plant} เลย Due แล้ว!</div><div class="alert-body">Due ${formatDate(c.dueDate)} · ${Math.abs(Math.floor(d))} วันที่แล้ว</div></div></div>`;
+    }
+  });
+  cultures.filter(c=>c.status==='contaminated').forEach(c=>{
+    html+=`<div class="alert alert-danger"><svg class="alert-icon" viewBox="0 0 18 18" fill="none" stroke="var(--danger)" stroke-width="1.7"><path d="M9 2L2 16h14z" stroke-linejoin="round"/><path d="M9 8v4M9 14v.01" stroke-linecap="round"/></svg><div><div class="alert-title">${c.id} — ${c.plant}</div><div class="alert-body">Contamination${c.closedDate?' · ปิด '+formatDate(c.closedDate):''}</div></div></div>`;
+  });
+  if(!html)html=`<div class="alert alert-success"><svg class="alert-icon" viewBox="0 0 18 18" fill="none" stroke="var(--accent)" stroke-width="1.7"><circle cx="9" cy="9" r="7"/><path d="M6 9l2 2 4-4" stroke-linecap="round"/></svg><div><div class="alert-title">ทุกอย่างปกติดี</div><div class="alert-body">ไม่มีการแจ้งเตือนในขณะนี้</div></div></div>`;
+  document.getElementById('alertsList').innerHTML=html;
+  const hasAlert=document.querySelectorAll('.alert-warn,.alert-danger').length>0;
+  document.getElementById('notifDot').classList.toggle('hidden',!hasAlert);
+}
+
+// ──────────────────────────────────────────────
+// SETTINGS
+// ──────────────────────────────────────────────
+function renderSettings(){
+  if(!currentUser)return;
+  document.getElementById('settingsAvatar').textContent=currentUser.avatar||currentUser.name[0];
+  document.getElementById('settingsName').textContent=currentUser.name;
+  document.getElementById('settingsEmail').textContent=currentUser.email;
+  const roleEl=document.getElementById('settingsRole');
+  roleEl.textContent=currentUser.role==='admin'?'Admin':'User';
+  roleEl.className='user-role '+(currentUser.role==='admin'?'role-admin':'role-user');
+
+  if(currentUser.role==='admin'){
+    document.getElementById('adminSection').classList.remove('hidden');
+    renderUserManagement();
+    renderFormulaList();
+  }
+}
+
+function renderUserManagement(){
+  const users=DB.users();
+  const pending=users.filter(u=>!u.approved);
+  const approved=users.filter(u=>u.approved&&u.id!==currentUser.id);
+
+  let pendHtml=pending.length?pending.map(u=>`<div class="user-item">
+    <div class="user-avatar" style="background:var(--warn-light);color:var(--warn-text)">${u.avatar||u.name[0]}</div>
+    <div style="flex:1"><div class="user-name">${u.name}</div><div style="font-size:11px;color:var(--text3)">${u.email}</div></div>
+    <div style="display:flex;gap:6px">
+      <button class="btn btn-outline btn-sm" style="color:var(--accent);border-color:var(--accent)" onclick="approveUser('${u.id}')">อนุมัติ</button>
+      <button class="btn btn-outline btn-sm" style="color:var(--danger);border-color:var(--danger)" onclick="rejectUser('${u.id}')">ปฏิเสธ</button>
+    </div>
+  </div>`).join(''):`<div style="font-size:12px;color:var(--text3);padding:8px 0">ไม่มีคำขอรออนุมัติ</div>`;
+  document.getElementById('pendingUsers').innerHTML=`<div class="card">${pendHtml}</div>`;
+
+  const isSuperAdmin=currentUser.superadmin===true;
+  let allHtml=approved.map(u=>{
+    const isSA=u.superadmin===true;
+    const roleLabel=u.role==='admin'?'Admin':'User';
+    const roleClass=u.role==='admin'?'role-admin':'role-user';
+    const canManage=!isSA;
+    let actions='';
+    if(canManage){
+      const toggleLabel=u.role==='admin'?'เปลี่ยนเป็น User':'เปลี่ยนเป็น Admin';
+      actions=`<div style="display:flex;flex-direction:column;gap:4px;align-items:flex-end">
+        <button class="btn btn-outline btn-sm" style="font-size:10px;padding:4px 8px" onclick="toggleUserRole('${u.id}')">${toggleLabel}</button>
+        <button class="btn btn-outline btn-sm" style="font-size:10px;padding:4px 8px;color:var(--danger);border-color:var(--danger)" onclick="deleteUser('${u.id}','${u.name}')">ลบบัญชี</button>
+      </div>`;
+    } else {
+      actions=`<span style="font-size:10px;color:var(--text3);padding:4px">ปกป้อง</span>`;
+    }
+    return `<div class="user-item">
+      <div class="user-avatar" style="background:var(--accent-light);color:var(--accent-text)">${u.avatar||u.name[0]}</div>
+      <div style="flex:1"><div class="user-name">${u.name}${isSA?` <span style="font-size:9px;background:var(--info-light);color:var(--info-text);padding:1px 5px;border-radius:4px;margin-left:4px">ผู้ดูแลหลัก</span>`:''}
+      </div><div style="font-size:11px;color:var(--text3)">${u.email}</div>
+      <span class="user-role ${roleClass}">${roleLabel}</span></div>
+      ${actions}
+    </div>`;
+  }).join('');
+
+  // Also show add-user form for admin
+  const addUserForm=`<div class="card" style="margin-top:12px">
+    <div class="section-label" style="margin-bottom:10px">เพิ่มผู้ใช้โดย Admin</div>
+    <div class="form-group"><label class="form-label">ชื่อ-นามสกุล</label><input class="inp" id="adminNewName" placeholder="ชื่อผู้ใช้"/></div>
+    <div class="form-group"><label class="form-label">อีเมล</label><input class="inp" id="adminNewEmail" type="email" placeholder="อีเมล"/></div>
+    <div class="form-group"><label class="form-label">รหัสผ่าน</label><input class="inp" id="adminNewPass" type="password" placeholder="อย่างน้อย 6 ตัวอักษร"/></div>
+    <div class="form-group" style="margin-bottom:10px"><label class="form-label">บทบาท</label>
+      <select class="inp" id="adminNewRole"><option value="user">User</option><option value="admin">Admin</option></select>
+    </div>
+    <button class="btn btn-primary" onclick="adminAddUser()">เพิ่มผู้ใช้</button>
+  </div>`;
+
+  document.getElementById('allUsers').innerHTML=`<div class="card">${allHtml||'<div style="font-size:12px;color:var(--text3);padding:8px 0">ไม่มีผู้ใช้อื่น</div>'}</div>${addUserForm}`;
+}
+
+function approveUser(id){
+  const users=DB.users();
+  const u=users.find(x=>x.id===id);
+  if(u){u.approved=true;DB.saveUsers(users);showToast('อนุมัติ '+u.name+' แล้ว');renderUserManagement();}
+}
+function rejectUser(id){
+  const users=DB.users().filter(x=>x.id!==id);
+  DB.saveUsers(users);showToast('ปฏิเสธแล้ว');renderUserManagement();
+}
+function toggleUserRole(id){
+  const users=DB.users();
+  const u=users.find(x=>x.id===id);
+  if(!u||u.superadmin)return;
+  u.role=u.role==='admin'?'user':'admin';
+  DB.saveUsers(users);
+  showToast('เปลี่ยนบทบาท '+u.name+' เป็น '+(u.role==='admin'?'Admin':'User')+' แล้ว');
+  renderUserManagement();
+}
+function deleteUser(id,name){
+  const users=DB.users();
+  const u=users.find(x=>x.id===id);
+  if(!u||u.superadmin){showToast('ไม่สามารถลบผู้ดูแลหลักได้');return;}
+  if(!confirm('ลบบัญชี "'+name+'" ใช่ไหม?'))return;
+  DB.saveUsers(users.filter(x=>x.id!==id));
+  showToast('ลบบัญชี '+name+' แล้ว');
+  renderUserManagement();
+}
+function adminAddUser(){
+  const name=document.getElementById('adminNewName').value.trim();
+  const email=document.getElementById('adminNewEmail').value.trim();
+  const pass=document.getElementById('adminNewPass').value;
+  const role=document.getElementById('adminNewRole').value;
+  if(!name||!email||!pass){showToast('กรุณากรอกข้อมูลให้ครบ');return;}
+  if(pass.length<6){showToast('รหัสผ่านต้องมีอย่างน้อย 6 ตัวอักษร');return;}
+  const users=DB.users();
+  if(users.find(u=>u.email===email)){showToast('อีเมลนี้ถูกใช้งานแล้ว');return;}
+  users.push({id:'u'+Date.now(),name,email,pass,role,approved:true,avatar:name[0]});
+  DB.saveUsers(users);
+  document.getElementById('adminNewName').value='';
+  document.getElementById('adminNewEmail').value='';
+  document.getElementById('adminNewPass').value='';
+  document.getElementById('adminNewRole').value='user';
+  showToast('เพิ่ม '+name+' ('+role+') สำเร็จ');
+  renderUserManagement();
+}
+
+function renderFormulaList(){
+  const formulas=DB.formulas();
+  document.getElementById('formulaList').innerHTML=formulas.map((f,i)=>`<div style="display:flex;justify-content:space-between;align-items:center;padding:10px 0;${i>0?'border-top:1px solid var(--border)':''}">
+    <div><div style="font-size:13px;font-weight:500">${f.name}</div><div style="font-size:11px;color:var(--text3)">${f.desc}</div></div>
+    <button onclick="deleteFormula('${f.id}')" style="color:var(--danger);font-size:12px;padding:4px 8px">ลบ</button>
+  </div>`).join('');
+}
+
+function addFormula(){
+  const name=document.getElementById('newFormulaName').value.trim();
+  const desc=document.getElementById('newFormulaDesc').value.trim();
+  if(!name)return;
+  const formulas=DB.formulas();
+  formulas.push({id:'f'+Date.now(),name,desc});
+  DB.saveFormulas(formulas);
+  document.getElementById('newFormulaName').value='';
+  document.getElementById('newFormulaDesc').value='';
+  renderFormulaList();
+  populateFormulaSelect();
+  showToast('เพิ่มสูตร '+name+' แล้ว');
+}
+
+function deleteFormula(id){
+  DB.saveFormulas(DB.formulas().filter(f=>f.id!==id));
+  renderFormulaList();populateFormulaSelect();
+}
+
+function toggleDarkMode(el){
+  el.classList.toggle('on');
+  document.documentElement.style.setProperty('--bg',el.classList.contains('on')?'#141414':'#f5f3ef');
+  document.documentElement.style.setProperty('--bg2',el.classList.contains('on')?'#1e1e1e':'#eceae4');
+  document.documentElement.style.setProperty('--bg3',el.classList.contains('on')?'#282828':'#e0ddd6');
+  document.documentElement.style.setProperty('--card',el.classList.contains('on')?'#1a1a1a':'#ffffff');
+  document.documentElement.style.setProperty('--border',el.classList.contains('on')?'#2a2a2a':'#d8d5ce');
+  document.documentElement.style.setProperty('--border2',el.classList.contains('on')?'#363636':'#c8c4bb');
+  document.documentElement.style.setProperty('--text',el.classList.contains('on')?'#f0ede8':'#1a1917');
+  document.documentElement.style.setProperty('--text2',el.classList.contains('on')?'#9a9690':'#6b6760');
+  document.documentElement.style.setProperty('--text3',el.classList.contains('on')?'#666360':'#9c9890');
+}
+
+// ──────────────────────────────────────────────
+// UTILITIES
+// ──────────────────────────────────────────────
+function formatDate(s){if(!s)return '—';const d=new Date(s);const m=['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];return d.getDate()+' '+m[d.getMonth()]+' '+(d.getFullYear()+543);}
+function formatDateShort(s){if(!s)return '';const d=new Date(s);return (d.getMonth()+1)+'/'+(d.getDate());}
+function formatDateTime(s){if(!s)return '';const d=new Date(s);const m=['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];return d.getDate()+' '+m[d.getMonth()]+' '+(d.getFullYear()+543)+' '+String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0');}
+function formatRelDate(s){if(!s)return '';const diff=(Date.now()-new Date(s))/1000;if(diff<3600)return Math.floor(diff/60)+' นาทีก่อน';if(diff<86400)return Math.floor(diff/3600)+' ชม.ก่อน';return Math.floor(diff/86400)+' วันก่อน';}
+function showToast(msg){const t=document.getElementById('toast');t.textContent=msg;t.style.opacity='1';setTimeout(()=>t.style.opacity='0',2500);}
+
+// Init
+window.addEventListener('DOMContentLoaded',()=>{
+  // Ensure superadmin always exists and cannot be removed
+  const users=DB.users();
+  const hasSA=users.find(u=>u.superadmin===true);
+  if(!hasSA){
+    users.unshift({id:'SUPERADMIN',name:'สาธิต ฉัตรพันธุ์',email:'Satit.c@psru.ac.th',pass:'254102',role:'admin',approved:true,avatar:'ส',superadmin:true});
+    DB.saveUsers(users);
+  }
+});
+</script>
+</body>
+</html>
