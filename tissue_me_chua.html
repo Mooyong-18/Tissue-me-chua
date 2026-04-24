@@ -550,7 +550,25 @@ textarea.inp{resize:vertical;min-height:72px}
             <div class="toggle" id="toggleDark" onclick="toggleDarkMode(this)"></div>
           </div>
         </div>
-        <div style="margin-top:16px">
+        <div class="section-label" style="margin-top:16px">สำรองและส่งออกข้อมูล</div>
+        <div class="card" style="margin-bottom:16px">
+          <div style="font-size:12px;color:var(--text2);margin-bottom:12px;line-height:1.6">ส่งออกข้อมูลทั้งหมดเพื่อสำรองหรือนำไปวิเคราะห์ต่อ</div>
+          <div style="display:flex;flex-direction:column;gap:8px">
+            <button class="btn btn-outline" onclick="exportJSON()" style="justify-content:flex-start;gap:10px">
+              <svg width="16" height="16" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M4 4h8l4 4v10H4V4z" stroke-linejoin="round"/><path d="M12 4v4h4M7 12h6M7 15h4" stroke-linecap="round"/></svg>
+              Export JSON (สำรองข้อมูลทั้งหมด)
+            </button>
+            <button class="btn btn-outline" onclick="exportCSV()" style="justify-content:flex-start;gap:10px">
+              <svg width="16" height="16" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.7"><rect x="3" y="3" width="14" height="14" rx="2"/><path d="M3 7h14M3 11h14M7 7v10" stroke-linecap="round"/></svg>
+              Export CSV (เปิดใน Excel/Google Sheets)
+            </button>
+            <button class="btn btn-outline" onclick="exportTempCSV()" style="justify-content:flex-start;gap:10px">
+              <svg width="16" height="16" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M10 3v8.5" stroke-linecap="round"/><circle cx="10" cy="14" r="3"/></svg>
+              Export อุณหภูมิ CSV
+            </button>
+          </div>
+        </div>
+        <div style="margin-top:4px">
           <button class="btn btn-danger" onclick="doLogout()">ออกจากระบบ</button>
         </div>
       </div>
@@ -864,14 +882,31 @@ function switchAuthTab(tab){
 function doLogin(){
   const email=document.getElementById('loginEmail').value.trim();
   const pass=document.getElementById('loginPass').value;
-  const users=DB.users();
-  const user=users.find(u=>(u.email||'').toLowerCase()===email.toLowerCase()&&String(u.pass)===String(pass));
   const err=document.getElementById('loginError');
-  if(!user){err.textContent='อีเมลหรือรหัสผ่านไม่ถูกต้อง';err.style.display='block';return}
-  if(!user.approved){err.textContent='บัญชียังรอการอนุมัติจาก Admin';err.style.display='block';return}
+  if(!email||!pass){err.textContent='กรุณากรอกอีเมลและรหัสผ่าน';err.style.display='block';return;}
+
+  // If users not loaded yet, load from Firebase first
+  if(DB._users.length===0){
+    err.textContent='';err.style.display='none';
+    showToast('กำลังตรวจสอบ...');
+    const{db,collection,getDocs}=FS;
+    getDocs(collection(db,'users')).then(snap=>{
+      DB._users=snap.docs.map(d=>d.data());
+      _doLoginCheck(email,pass,err);
+    }).catch(e=>{
+      err.textContent='ไม่สามารถเชื่อมต่อได้ กรุณาลองใหม่';err.style.display='block';
+    });
+    return;
+  }
+  _doLoginCheck(email,pass,err);
+}
+
+function _doLoginCheck(email,pass,err){
+  const user=DB._users.find(u=>(u.email||'').toLowerCase()===email.toLowerCase()&&String(u.pass)===String(pass));
+  if(!user){err.textContent='อีเมลหรือรหัสผ่านไม่ถูกต้อง';err.style.display='block';return;}
+  if(!user.approved){err.textContent='บัญชียังรอการอนุมัติจาก Admin';err.style.display='block';return;}
   err.style.display='none';
   currentUser=user;
-  // Persist session
   try{localStorage.setItem('tmc_session',JSON.stringify({id:user.id,email:user.email,time:Date.now()}));}catch(e){}
   document.getElementById('login-page').classList.add('hidden');
   document.getElementById('app').classList.remove('hidden');
@@ -1712,6 +1747,92 @@ function toggleDarkMode(el){
   document.documentElement.style.setProperty('--text',el.classList.contains('on')?'#f0ede8':'#1a1917');
   document.documentElement.style.setProperty('--text2',el.classList.contains('on')?'#9a9690':'#6b6760');
   document.documentElement.style.setProperty('--text3',el.classList.contains('on')?'#666360':'#9c9890');
+}
+
+// ──────────────────────────────────────────────
+// EXPORT / BACKUP
+// ──────────────────────────────────────────────
+function downloadFile(filename, content, mimeType){
+  const blob = new Blob([content], {type: mimeType});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+function exportJSON(){
+  const data = {
+    exportDate: new Date().toISOString(),
+    exportBy: currentUser ? currentUser.name : 'unknown',
+    cultures: DB.cultures(),
+    temps: DB.temps(),
+    formulas: DB.formulas(),
+    plants: DB.plants(),
+    notes: DB.notes().map(n=>({...n, content: n.content}))
+  };
+  // Remove base64 photos to keep file small (optional)
+  const light = JSON.parse(JSON.stringify(data));
+  light.cultures.forEach(c=>{
+    c.photos=(c.photos||[]).map(p=>({date:p.date,note:'[photo_base64_removed]'}));
+    (c.updates||[]).forEach(u=>{u.photos=(u.photos||[]).map(p=>({date:p.date,note:'[photo_base64_removed]'}));});
+  });
+  const date = new Date().toISOString().slice(0,10);
+  downloadFile(`TissueMeChua_backup_${date}.json`, JSON.stringify(data, null, 2), 'application/json');
+  showToast('Export JSON สำเร็จ');
+}
+
+function exportCSV(){
+  const cultures = DB.cultures();
+  const headers = ['ID','ชนิดพืช','Explant','สูตรอาหาร','วันเริ่ม','Due Date','ผู้ทำ','Subculture ครั้งที่','มาจากขวด','สถานะ','วันปิด','อัพเดตล่าสุด','จำนวนยอด','จำนวนราก','ความยาวต้น(cm)','ความยาวราก(cm)','แท็ก','บันทึก'];
+  const rows = cultures.map(c=>{
+    const last = c.updates&&c.updates.length ? c.updates[c.updates.length-1] : null;
+    const statusTh = {'growing_well':'โตดี','growing_normal':'โตปกติ','growing_slow':'โตช้า','contaminated':'Contaminated','subcultured':'Subcultured'}[c.status]||c.status;
+    return [
+      c.id,
+      `"${c.plant||''}"`,
+      `"${c.explant||''}"`,
+      `"${c.formula||''}"`,
+      c.startDate||'',
+      c.dueDate||'',
+      `"${c.operator||''}"`,
+      c.subnum||0,
+      `"${c.parentId||''}"`,
+      statusTh,
+      c.closedDate||'',
+      last ? last.date||'' : '',
+      last ? (last.shoots||0) : '',
+      last ? (last.roots||0) : '',
+      last ? (last.shootLen||0) : '',
+      last ? (last.rootLen||0) : '',
+      `"${(c.tags||[]).join(' ')}"`,
+      `"${(c.note||'').replace(/"/g,"'").replace(/\n/g,' ')}"`
+    ].join(',');
+  });
+  const bom = '\uFEFF'; // BOM for Thai UTF-8 in Excel
+  const csv = bom + [headers.join(','), ...rows].join('\n');
+  const date = new Date().toISOString().slice(0,10);
+  downloadFile(`TissueMeChua_cultures_${date}.csv`, csv, 'text/csv;charset=utf-8');
+  showToast('Export CSV สำเร็จ ('+cultures.length+' รายการ)');
+}
+
+function exportTempCSV(){
+  const temps = DB.temps().slice().sort((a,b)=>a.datetime.localeCompare(b.datetime));
+  const headers = ['วัน-เวลา','อุณหภูมิ(°C)','ความชื้น(%)','หมายเหตุ'];
+  const rows = temps.map(t=>[
+    t.datetime||'',
+    t.temp||'',
+    t.humidity||'',
+    `"${(t.note||'').replace(/"/g,"'")}"`
+  ].join(','));
+  const bom = '\uFEFF';
+  const csv = bom + [headers.join(','), ...rows].join('\n');
+  const date = new Date().toISOString().slice(0,10);
+  downloadFile(`TissueMeChua_temperature_${date}.csv`, csv, 'text/csv;charset=utf-8');
+  showToast('Export อุณหภูมิ CSV สำเร็จ ('+temps.length+' รายการ)');
 }
 
 // ──────────────────────────────────────────────
