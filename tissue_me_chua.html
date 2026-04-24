@@ -8,6 +8,7 @@
 <meta name="apple-mobile-web-app-title" content="Tissue Me Chua">
 <meta name="theme-color" content="#f5f3ef">
 <title>Tissue Me Chua</title>
+<!-- Fixed: formulas sync via Firestore instead of localStorage -->
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;1,9..40,300&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
 <script type="module">
@@ -871,8 +872,18 @@ const DB = {
   cultures(){return this._cultures},
   temps(){return this._temps},
   users(){return this._users},
-  formulas(){return JSON.parse(localStorage.getItem('tmc_formulas')||'null')||this._formulas},
-  saveFormulas(d){localStorage.setItem('tmc_formulas',JSON.stringify(d));this._formulas=d;},
+  formulas(){return this._formulas},
+  async saveFormula(f){
+    const{db,doc,setDoc}=FS;
+    await setDoc(doc(db,'formulas',f.id),f);
+    const idx=this._formulas.findIndex(x=>x.id===f.id);
+    if(idx>-1)this._formulas[idx]=f;else this._formulas.push(f);
+  },
+  async deleteFormulaById(id){
+    const{db,doc,deleteDoc}=FS;
+    await deleteDoc(doc(db,'formulas',id));
+    this._formulas=this._formulas.filter(f=>f.id!==id);
+  },
 
   async saveCulture(c){
     const{db,doc,setDoc}=FS;
@@ -934,10 +945,11 @@ const DB = {
 
   async loadAll(){
     const{db,collection,getDocs}=FS;
-    const [cu,tu,uu,pu,nu,iv,pr,sc]=await Promise.all([
+    const [cu,tu,uu,fu,pu,nu,iv,pr,sc]=await Promise.all([
       getDocs(collection(db,'cultures')),
       getDocs(collection(db,'temps')),
       getDocs(collection(db,'users')),
+      getDocs(collection(db,'formulas')),
       getDocs(collection(db,'plants')),
       getDocs(collection(db,'notes')),
       getDocs(collection(db,'inventory')),
@@ -947,6 +959,28 @@ const DB = {
     this._cultures=cu.docs.map(d=>d.data());
     this._temps=tu.docs.map(d=>d.data()).sort((a,b)=>a.datetime.localeCompare(b.datetime));
     this._users=uu.docs.map(d=>d.data());
+    this._formulas=fu.docs.map(d=>d.data());
+
+    // MIGRATION: สูตรอาหารเดิมเคยเก็บใน localStorage เฉพาะเครื่อง
+    // ถ้าใน Cloud ยังไม่มีสูตร ให้ย้ายสูตรจากเครื่องนี้ขึ้น Firestore อัตโนมัติ
+    if(this._formulas.length===0){
+      let localFormulas=[];
+      try{localFormulas=JSON.parse(localStorage.getItem('tmc_formulas')||'[]')||[];}catch(e){localFormulas=[];}
+      const seedFormulas=localFormulas.length?localFormulas:[
+        {id:'f1',name:'F1',desc:'MS + BAP 1mg/L'},
+        {id:'f2',name:'F2',desc:'MS + NAA 0.5mg/L'},
+        {id:'f3',name:'F3',desc:'WPM + Kinetin 2mg/L'},
+        {id:'f4',name:'F4',desc:'MS + 2,4-D 1mg/L'},
+        {id:'f5',name:'F5',desc:'MS เต็มสูตร'}
+      ];
+      for(const f of seedFormulas){
+        const safe={id:f.id||('f'+Date.now()+'_'+Math.random().toString(36).slice(2,6)),name:f.name||'',desc:f.desc||''};
+        if(safe.name)await setDoc(doc(db,'formulas',safe.id),safe);
+      }
+      const fu2=await getDocs(collection(db,'formulas'));
+      this._formulas=fu2.docs.map(d=>d.data());
+    }
+
     this._plants=pu.docs.map(d=>d.data());
     this._notes=nu.docs.map(d=>d.data());
     this._inventory=iv.docs.map(d=>d.data());
@@ -1233,6 +1267,15 @@ function showPage(name){
   if(name==='lab'){renderSchedule();renderInventory();renderProtocols();renderTempHistory();renderTempChart();renderAlerts();setDefaultDates();}
   if(name==='settings')renderSettings();
   if(name==='add'){if(!editMode){resetAddForm();}populateFormulaSelect();}
+}
+
+
+
+function backFromDetail(){
+  currentDetailId=null;
+  document.getElementById('detailTopbar').classList.add('hidden');
+  document.getElementById('mainTopbar').classList.remove('hidden');
+  showPage('list');
 }
 
 function switchLabTab(tab, el){
@@ -2135,14 +2178,13 @@ function renderFormulaList(){
   </div>`).join(''):'<div style="font-size:12px;color:var(--text3);padding:8px 0">ยังไม่มีสูตรอาหาร</div>';
 }
 
-function addFormula(){
+async function addFormula(){
   const name=document.getElementById('newFormulaName').value.trim();
   const desc=document.getElementById('newFormulaDesc').value.trim();
   if(!name){showToast('กรุณากรอกชื่อสูตร');return;}
   const formulas=DB.formulas();
-  if(formulas.find(f=>f.name===name)){showToast('ชื่อสูตรซ้ำ');return;}
-  formulas.push({id:'f'+Date.now(),name,desc});
-  DB.saveFormulas(formulas);
+  if(formulas.find(f=>(f.name||'').toLowerCase()===name.toLowerCase())){showToast('ชื่อสูตรซ้ำ');return;}
+  await DB.saveFormula({id:'f'+Date.now(),name,desc,updatedAt:Date.now()});
   document.getElementById('newFormulaName').value='';
   document.getElementById('newFormulaDesc').value='';
   renderFormulaList();
@@ -2150,10 +2192,11 @@ function addFormula(){
   showToast('เพิ่มสูตร '+name+' แล้ว');
 }
 
-function deleteFormula(id){
+async function deleteFormula(id){
   if(!confirm('ลบสูตรนี้ใช่ไหม?'))return;
-  DB.saveFormulas(DB.formulas().filter(f=>f.id!==id));
+  await DB.deleteFormulaById(id);
   renderFormulaList();populateFormulaSelect();
+  showToast('ลบสูตรแล้ว');
 }
 
 // Plant management
@@ -2402,13 +2445,14 @@ window.addEventListener('DOMContentLoaded',()=>{
 });
 
 // Realtime sync — listens to Firestore changes and updates UI live
-let _unsubCultures=null,_unsubTemps=null,_unsubUsers=null,_unsubSchedule=null,_unsubInventory=null,_unsubProtocols=null;
+let _unsubCultures=null,_unsubTemps=null,_unsubUsers=null,_unsubFormulas=null,_unsubSchedule=null,_unsubInventory=null,_unsubProtocols=null;
 function setupRealtimeSync(){
   const{db,collection,onSnapshot}=FS;
-  [_unsubCultures,_unsubTemps,_unsubUsers,_unsubSchedule,_unsubInventory,_unsubProtocols].forEach(u=>{try{if(u)u();}catch(e){}});
+  [_unsubCultures,_unsubTemps,_unsubUsers,_unsubFormulas,_unsubSchedule,_unsubInventory,_unsubProtocols].forEach(u=>{try{if(u)u();}catch(e){}});
   _unsubCultures=onSnapshot(collection(db,'cultures'),snap=>{DB._cultures=snap.docs.map(d=>d.data());refreshCurrentPage();});
   _unsubTemps=onSnapshot(collection(db,'temps'),snap=>{DB._temps=snap.docs.map(d=>d.data()).sort((a,b)=>a.datetime.localeCompare(b.datetime));if(currentPage==='lab'||currentPage==='dashboard')refreshCurrentPage();});
   _unsubUsers=onSnapshot(collection(db,'users'),snap=>{DB._users=snap.docs.map(d=>d.data());if(currentPage==='settings')renderSettings();});
+  _unsubFormulas=onSnapshot(collection(db,'formulas'),snap=>{DB._formulas=snap.docs.map(d=>d.data());populateFormulaSelect();if(currentPage==='settings')renderFormulaList();});
   _unsubSchedule=onSnapshot(collection(db,'schedule'),snap=>{DB._schedule=snap.docs.map(d=>d.data());if(currentPage==='lab')renderSchedule();});
   _unsubInventory=onSnapshot(collection(db,'inventory'),snap=>{DB._inventory=snap.docs.map(d=>d.data());if(currentPage==='lab')renderInventory();});
   _unsubProtocols=onSnapshot(collection(db,'protocols'),snap=>{DB._protocols=snap.docs.map(d=>d.data());if(currentPage==='lab')renderProtocols();});
