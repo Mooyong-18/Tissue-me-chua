@@ -8,6 +8,7 @@
 <meta name="apple-mobile-web-app-title" content="Tissue Me Chua">
 <meta name="theme-color" content="#f5f3ef">
 <title>Tissue Me Chua</title>
+<!-- Fixed: formulas sync via Firestore instead of localStorage -->
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;1,9..40,300&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
 <script type="module">
@@ -247,6 +248,37 @@ textarea.inp{resize:vertical;min-height:72px}
 /* FAB */
 .fab{position:fixed;bottom:88px;right:16px;width:48px;height:48px;background:var(--accent);border-radius:50%;border:none;color:#fff;font-size:22px;display:flex;align-items:center;justify-content:center;box-shadow:var(--shadow-md);z-index:199;cursor:pointer;transition:transform .15s}
 .fab:active{transform:scale(.93)}
+
+/* ── PRO LAB FEATURES ── */
+.pro-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.pro-card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:12px;box-shadow:var(--shadow)}
+.pro-title{font-size:11px;color:var(--text3);margin-bottom:4px}
+.pro-value{font-size:18px;font-weight:700;color:var(--text)}
+.health-wrap{margin-top:10px}
+.health-head{display:flex;justify-content:space-between;align-items:center;font-size:11px;margin-bottom:5px;color:var(--text2)}
+.health-bar{height:6px;background:var(--bg3);border-radius:99px;overflow:hidden}
+.health-fill{height:100%;border-radius:99px;background:var(--accent)}
+.health-fill.warn{background:var(--warn)}
+.health-fill.danger{background:var(--danger)}
+.action-box{border-radius:var(--radius-sm);padding:10px 12px;font-size:12px;margin-top:10px;border:1px solid var(--border);background:var(--bg)}
+.action-normal{background:var(--accent-light);color:var(--accent-text);border-color:#95d5b2}
+.action-warn{background:var(--warn-light);color:var(--warn-text);border-color:#fcd34d}
+.action-danger{background:var(--danger-light);color:var(--danger-text);border-color:#fca5a5}
+.batch-card{background:linear-gradient(180deg,var(--card),var(--bg));border:1px solid var(--border);border-radius:var(--radius);padding:13px;box-shadow:var(--shadow)}
+.batch-card+.batch-card{margin-top:8px}
+.batch-name{font-size:14px;font-weight:700;color:var(--text)}
+.batch-meta{font-size:11px;color:var(--text2);margin-top:2px}
+.batch-kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-top:10px}
+.batch-kpi{background:var(--card);border:1px solid var(--border);border-radius:8px;padding:7px;text-align:center}
+.batch-kpi b{display:block;font-size:15px;color:var(--text)}
+.batch-kpi span{font-size:9px;color:var(--text3)}
+.feed-item{display:flex;gap:10px;padding:10px 0;border-bottom:1px solid var(--border)}
+.feed-item:last-child{border-bottom:none}
+.feed-dot{width:9px;height:9px;border-radius:50%;background:var(--accent);margin-top:5px;flex-shrink:0}
+.feed-title{font-size:12px;font-weight:600;color:var(--text)}
+.feed-sub{font-size:11px;color:var(--text3);margin-top:1px}
+.compare-row{display:grid;grid-template-columns:1fr auto 1fr;gap:8px;align-items:center}
+.compare-box{border:1px solid var(--border);border-radius:var(--radius-sm);padding:10px;background:var(--bg)}
 </style>
 </head>
 <body>
@@ -347,6 +379,18 @@ textarea.inp{resize:vertical;min-height:72px}
       </div>
       <div id="alertsSection" class="section" style="padding-top:0"></div>
       <div class="section" style="padding-top:0">
+        <div class="section-label">Lab KPI / ตัวชี้วัดแล็บ</div>
+        <div id="proKpiGrid" class="pro-grid"></div>
+      </div>
+      <div class="section" style="padding-top:0">
+        <div class="section-label">Batch Overview / ภาพรวมชุดทดลอง</div>
+        <div id="batchOverview"></div>
+      </div>
+      <div class="section" style="padding-top:0">
+        <div class="section-label">Activity Feed / กิจกรรมล่าสุด</div>
+        <div id="activityFeed" class="card"></div>
+      </div>
+      <div class="section" style="padding-top:0">
         <div class="section-label">Culture ล่าสุด</div>
         <div id="recentCultures"></div>
       </div>
@@ -384,6 +428,17 @@ textarea.inp{resize:vertical;min-height:72px}
             <option value="">เลือกชนิดพืช</option>
           </select>
           <div style="font-size:11px;color:var(--text3);margin-top:4px">เพิ่มชนิดพืชได้ในหน้า "ตั้งค่า"</div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">Batch / Lot</label>
+            <input class="inp" id="f_batch" type="text" placeholder="เช่น Banana_A_01"/>
+            <div style="font-size:11px;color:var(--text3);margin-top:4px">ใช้จัดกลุ่ม culture ที่เริ่มพร้อมกัน</div>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Cycle</label>
+            <div class="inp-unit"><input class="inp" id="f_cycle" type="number" min="0" placeholder="0"/><span>รอบ</span></div>
+          </div>
         </div>
         <div class="form-row">
           <div class="form-group">
@@ -471,11 +526,7 @@ textarea.inp{resize:vertical;min-height:72px}
         <div class="card" style="margin-bottom:14px"><div class="chart-container"><canvas id="contChart"></canvas></div></div>
         <div class="section-label">การเจริญเติบโตเฉลี่ย (cm)</div>
         <div id="growthSummary" style="margin-bottom:16px"></div>
-        <div class="section-label">🌿 Multiplication Rate / อัตราขยายพันธุ์</div>
-        <div id="multiRateSection" style="margin-bottom:16px"></div>
-        <div class="section-label">🔮 Predictive Analytics / ทำนายและแจ้งเตือนล่วงหน้า</div>
-        <div id="predictiveSection" style="margin-bottom:16px"></div>
-        <div class="section-label">เปรียบเทียบการเจริญ (Best vs Watch)</div>
+        <div class="section-label">Compare Growth / เปรียบเทียบการเจริญ</div>
         <div id="compareGrowth" style="margin-bottom:16px"></div>
       </div>
     </div>
@@ -626,16 +677,9 @@ textarea.inp{resize:vertical;min-height:72px}
               <svg width="16" height="16" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M10 3v8.5" stroke-linecap="round"/><circle cx="10" cy="14" r="3"/></svg>
               Export อุณหภูมิ CSV
             </button>
-            <button class="btn btn-primary" onclick="generatePDFReport()" style="justify-content:flex-start;gap:10px">
-              <svg width="16" height="16" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M4 4h8l4 4v10H4V4z" stroke-linejoin="round"/><path d="M12 4v4h4" stroke-linecap="round"/><path d="M7 10h6M7 13h4" stroke-linecap="round"/></svg>
-              📄 สร้างรายงาน PDF
-            </button>
           </div>
         </div>
-        <div style="margin-top:4px;display:flex;flex-direction:column;gap:8px">
-          <button class="btn btn-outline" onclick="showFirestoreRulesGuide()" style="justify-content:flex-start;gap:8px;border-color:var(--danger);color:var(--danger)">
-            🔐 ตั้งค่าความปลอดภัย Firestore
-          </button>
+        <div style="margin-top:4px">
           <button class="btn btn-danger" onclick="doLogout()">ออกจากระบบ</button>
         </div>
       </div>
@@ -874,20 +918,25 @@ textarea.inp{resize:vertical;min-height:72px}
 // ──────────────────────────────────────────────
 const DB = {
   // LOCAL CACHE (for fast UI rendering)
-  _cultures:[],_temps:[],_users:[],_formulas:[
+  _cultures:[],_temps:[],_users:[],_batches:[],_formulas:[
     {id:'f1',name:'F1',desc:'MS + BAP 1mg/L'},
     {id:'f2',name:'F2',desc:'MS + NAA 0.5mg/L'},
     {id:'f3',name:'F3',desc:'WPM + Kinetin 2mg/L'},
     {id:'f4',name:'F4',desc:'MS + 2,4-D 1mg/L'},
     {id:'f5',name:'F5',desc:'MS เต็มสูตร'}
   ],
-  cultures(){
-    return this._cultures.filter(c=>canSeeItem(c,'cultures'));
-  },
-  allCultures(){return this._cultures;},
+  cultures(){return this._cultures.filter(c=>canSeeItem(c,'cultures'))},
+  allCultures(){return this._cultures},
   temps(){return this._temps},
   users(){return this._users},
+  batches(){return this._batches},
   formulas(){return this._formulas},
+  async saveBatch(b){
+    const{db,doc,setDoc}=FS;
+    await setDoc(doc(db,'batches',b.id),b);
+    const idx=this._batches.findIndex(x=>x.id===b.id);
+    if(idx>-1)this._batches[idx]=b;else this._batches.push(b);
+  },
   async saveFormula(f){
     const{db,doc,setDoc}=FS;
     await setDoc(doc(db,'formulas',f.id),f);
@@ -945,8 +994,8 @@ const DB = {
   },
 
   _notes:[],
-  notes(){return this._notes.filter(n=>canSeeItem(n,'notes'));},
-  allNotes(){return this._notes;},
+  notes(){return this._notes.filter(n=>canSeeItem(n,'notes'))},
+  allNotes(){return this._notes},
   async saveNote(n){
     const{db,doc,setDoc}=FS;
     await setDoc(doc(db,'notes',n.id),n);
@@ -961,7 +1010,7 @@ const DB = {
 
   async loadAll(){
     const{db,collection,getDocs,doc,setDoc}=FS;
-    const [cu,tu,uu,fu,pu,nu,iv,pr,sc]=await Promise.all([
+    const [cu,tu,uu,fu,pu,nu,iv,pr,sc,ba]=await Promise.all([
       getDocs(collection(db,'cultures')),
       getDocs(collection(db,'temps')),
       getDocs(collection(db,'users')),
@@ -970,32 +1019,32 @@ const DB = {
       getDocs(collection(db,'notes')),
       getDocs(collection(db,'inventory')),
       getDocs(collection(db,'protocols')),
-      getDocs(collection(db,'schedule'))
+      getDocs(collection(db,'schedule')),
+      getDocs(collection(db,'batches'))
     ]);
     this._cultures=cu.docs.map(d=>d.data());
     this._temps=tu.docs.map(d=>d.data()).sort((a,b)=>a.datetime.localeCompare(b.datetime));
     this._users=uu.docs.map(d=>d.data());
     this._formulas=fu.docs.map(d=>d.data());
 
-    // Migrate: ถ้า Firestore ยังไม่มีสูตร ให้ย้ายจาก localStorage หรือใช้ค่าเริ่มต้น
+    // MIGRATION: สูตรอาหารเดิมเคยเก็บใน localStorage เฉพาะเครื่อง
+    // ถ้าใน Cloud ยังไม่มีสูตร ให้ย้ายสูตรจากเครื่องนี้ขึ้น Firestore อัตโนมัติ
     if(this._formulas.length===0){
-      let local=[];
-      try{local=JSON.parse(localStorage.getItem('tmc_formulas')||'[]')||[];}catch(e){}
-      const seed=local.length?local:[
+      let localFormulas=[];
+      try{localFormulas=JSON.parse(localStorage.getItem('tmc_formulas')||'[]')||[];}catch(e){localFormulas=[];}
+      const seedFormulas=localFormulas.length?localFormulas:[
         {id:'f1',name:'F1',desc:'MS + BAP 1mg/L'},
         {id:'f2',name:'F2',desc:'MS + NAA 0.5mg/L'},
         {id:'f3',name:'F3',desc:'WPM + Kinetin 2mg/L'},
         {id:'f4',name:'F4',desc:'MS + 2,4-D 1mg/L'},
         {id:'f5',name:'F5',desc:'MS เต็มสูตร'}
       ];
-      for(const f of seed){
+      for(const f of seedFormulas){
         const safe={id:f.id||('f'+Date.now()+'_'+Math.random().toString(36).slice(2,6)),name:f.name||'',desc:f.desc||''};
-        if(safe.name) await setDoc(doc(db,'formulas',safe.id),safe);
+        if(safe.name)await setDoc(doc(db,'formulas',safe.id),safe);
       }
       const fu2=await getDocs(collection(db,'formulas'));
       this._formulas=fu2.docs.map(d=>d.data());
-      // Clear old localStorage after migration
-      try{localStorage.removeItem('tmc_formulas');}catch(e){}
     }
 
     this._plants=pu.docs.map(d=>d.data());
@@ -1003,6 +1052,36 @@ const DB = {
     this._inventory=iv.docs.map(d=>d.data());
     this._protocols=pr.docs.map(d=>d.data());
     this._schedule=sc.docs.map(d=>d.data());
+    this._batches=ba.docs.map(d=>d.data());
+    await this.migrateBatchesFromCultures();
+  },
+
+
+  async migrateBatchesFromCultures(){
+    const{db,doc,setDoc}=FS;
+    const existing=new Set((this._batches||[]).map(b=>b.name));
+    const groups={};
+    this._cultures.forEach(c=>{
+      const name=(c.batchName||c.batch||'').trim();
+      if(!name)return;
+      if(!groups[name])groups[name]=[];
+      groups[name].push(c);
+    });
+    for(const name of Object.keys(groups)){
+      if(existing.has(name))continue;
+      const first=groups[name][0];
+      const b={
+        id:'batch_'+name.replace(/[^a-zA-Z0-9ก-๙_-]+/g,'_')+'_'+Date.now(),
+        name,
+        species:first.plant||'',
+        formula:first.formula||'',
+        createdAt:first.startDate||new Date().toISOString().slice(0,10),
+        owner:first.operator||'',
+        note:'Auto-created from existing cultures'
+      };
+      await setDoc(doc(db,'batches',b.id),b);
+      this._batches.push(b);
+    }
   },
 
   nextCultureId(){
@@ -1106,83 +1185,82 @@ let pendingPhotosAdd=[];
 let pendingPhotosUpdate=[];
 
 // ──────────────────────────────────────────────
-// PERMISSION SYSTEM (ข้อ 2 & 3)
+// PERMISSION SYSTEM (client-side role controls)
 // ──────────────────────────────────────────────
-const DEFAULT_PERMISSIONS={
-  viewAllCultures:false,   // เห็นข้อมูลทุกคน (false = เห็นแค่ของตัวเอง)
-  addCultures:true,        // เพิ่ม culture ได้
-  editCultures:true,       // แก้ไข culture ได้
-  deleteCultures:false,    // ลบ culture ได้
-  managePlants:false,      // จัดการชนิดพืช
-  manageFormulas:false,    // จัดการสูตรอาหาร
-  viewNotes:true,          // ดูบันทึก
-  editNotes:true,          // เพิ่ม/แก้ไขบันทึก
-  manageLabTools:false,    // จัดการ Schedule/Inventory/Protocol
-  manageUsers:false        // จัดการผู้ใช้
+const DEFAULT_PERMISSIONS = {
+  viewAllCultures:false,
+  addCultures:true,
+  editCultures:true,
+  deleteCultures:false,
+  managePlants:false,
+  manageFormulas:false,
+  viewNotes:true,
+  editNotes:true,
+  manageLabTools:false,
+  manageUsers:false
 };
 
 function getPerms(user=currentUser){
-  if(!user)return{...DEFAULT_PERMISSIONS};
-  // Admin/Superadmin มีสิทธิ์ทุกอย่าง
-  if(user.superadmin||user.role==='admin'){
-    return{viewAllCultures:true,addCultures:true,editCultures:true,deleteCultures:true,
-      managePlants:true,manageFormulas:true,viewNotes:true,editNotes:true,
-      manageLabTools:true,manageUsers:true,...(user.permissions||{})};
+  if(!user)return {...DEFAULT_PERMISSIONS};
+  if(user.superadmin || user.role==='admin'){
+    return {
+      viewAllCultures:true,
+      addCultures:true,
+      editCultures:true,
+      deleteCultures:true,
+      managePlants:true,
+      manageFormulas:true,
+      viewNotes:true,
+      editNotes:true,
+      manageLabTools:true,
+      manageUsers:true,
+      ...(user.permissions||{})
+    };
   }
-  return{...DEFAULT_PERMISSIONS,...(user.permissions||{})};
+  return {...DEFAULT_PERMISSIONS,...(user.permissions||{})};
 }
-function can(key){return!!getPerms()[key];}
-
-// ตรวจว่า item นี้เป็นของ currentUser หรือไม่
+function can(key){return !!getPerms()[key];}
 function ownsItem(item){
   if(!currentUser)return false;
-  if(!item)return false;
-  // ถ้า item ไม่มี ownerId = data เก่า ให้ทุกคนเห็นได้
-  if(!item.ownerId)return true;
-  return item.ownerId===currentUser.id;
+  return !item.ownerId || item.ownerId===currentUser.id || item.createdBy===currentUser.id || item.userId===currentUser.id;
 }
-
-// ตรวจว่า currentUser มีสิทธิ์ดู item นี้ไหม
 function canSeeItem(item,type='cultures'){
   if(!currentUser)return false;
-  if(currentUser.superadmin||currentUser.role==='admin')return true;
-  if(type==='cultures')return can('viewAllCultures')||ownsItem(item);
-  if(type==='notes')return can('viewNotes')&&(can('viewAllCultures')||ownsItem(item));
+  if(currentUser.superadmin || currentUser.role==='admin')return true;
+  if(type==='cultures')return can('viewAllCultures') || ownsItem(item);
+  if(type==='notes')return can('viewNotes') && (can('viewAllCultures') || ownsItem(item));
   return true;
 }
-
-// ตรวจว่า currentUser มีสิทธิ์แก้ไข item นี้ไหม
 function canEditItem(item,type='cultures'){
   if(!currentUser)return false;
-  if(currentUser.superadmin||currentUser.role==='admin')return true;
-  if(type==='cultures')return can('editCultures')&&(can('viewAllCultures')||ownsItem(item));
-  if(type==='notes')return can('editNotes')&&(can('viewAllCultures')||ownsItem(item));
+  if(currentUser.superadmin || currentUser.role==='admin')return true;
+  if(type==='cultures')return can('editCultures') && (can('viewAllCultures') || ownsItem(item));
+  if(type==='notes')return can('editNotes') && (can('viewAllCultures') || ownsItem(item));
   return false;
 }
-
-// สร้าง checkbox สำหรับ permission ใน UI
 function permissionCheckbox(user,key,label){
   const checked=getPerms(user)[key]?'checked':'';
   const disabled=(user.superadmin||user.role==='admin')?'disabled':'';
-  return`<label style="display:flex;align-items:center;gap:6px;font-size:11px;color:var(--text2);padding:3px 0;cursor:pointer">
-    <input type="checkbox" ${checked} ${disabled} style="width:14px;height:14px;accent-color:var(--accent)"
-      onchange="toggleUserPermission('${user.id}','${key}',this.checked)">
+  return `<label style="display:flex;align-items:center;gap:6px;font-size:11px;color:var(--text2);margin:4px 0">
+    <input type="checkbox" ${checked} ${disabled} onchange="toggleUserPermission('${user.id}','${key}',this.checked)">
     ${label}
   </label>`;
 }
-
 async function toggleUserPermission(id,key,value){
   const u=DB.users().find(x=>x.id===id);
   if(!u||u.superadmin||u.role==='admin')return;
   u.permissions={...DEFAULT_PERMISSIONS,...(u.permissions||{}),[key]:!!value};
   await DB.saveUser(u);
-  showToast('อัปเดตสิทธิ์ '+u.name+' แล้ว');
+  showToast('อัปเดตสิทธิ์แล้ว');
+  renderUserManagement();
 }
-
 function applyPermissionUI(){
   const fab=document.getElementById('mainFab');
   if(fab)fab.classList.toggle('hidden',currentPage!=='list'||!can('addCultures'));
+  const navAdd=document.getElementById('nav-add');
+  if(navAdd)navAdd.style.display=can('addCultures')?'flex':'none';
 }
+
 
 // ──────────────────────────────────────────────
 // AUTH
@@ -1343,7 +1421,6 @@ function populateFormulaSelect(){
 // NAVIGATION
 // ──────────────────────────────────────────────
 function showPage(name){
-  // Permission guard
   if(name==='add'&&!editMode&&!can('addCultures')){showToast('บัญชีนี้ไม่มีสิทธิ์เพิ่ม Culture');return;}
   document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
   document.querySelectorAll('.nav-btn').forEach(b=>b.classList.remove('active'));
@@ -1368,12 +1445,155 @@ function showPage(name){
   if(name==='add'){if(!editMode){resetAddForm();}populateFormulaSelect();}
 }
 
+
+
+function backFromDetail(){
+  currentDetailId=null;
+  document.getElementById('detailTopbar').classList.add('hidden');
+  document.getElementById('mainTopbar').classList.remove('hidden');
+  showPage('list');
+}
+
 function switchLabTab(tab, el){
   ['schedule','inventory','protocol','temp','alerts'].forEach(t=>{
     document.getElementById('labTab-'+t).classList.toggle('hidden', t!==tab);
   });
   document.querySelectorAll('#labTabs .tab-btn').forEach(b=>b.classList.remove('active'));
   if(el)el.classList.add('active');
+}
+
+
+// ──────────────────────────────────────────────
+// PRO LAB HELPERS: Batch / Health / Action / Feed
+// ──────────────────────────────────────────────
+function cultureDays(c){
+  if(!c||!c.startDate)return 0;
+  const start=new Date(c.startDate);
+  const end=c.closedDate?new Date(c.closedDate):new Date();
+  return Math.max(0,Math.floor((end-start)/86400000));
+}
+function latestUpdate(c){return c&&c.updates&&c.updates.length?c.updates[c.updates.length-1]:null;}
+function calculateHealth(c){
+  if(!c)return 0;
+  if(c.status==='contaminated')return 0;
+  if(c.closedDate)return 70;
+  let score=100;
+  const days=cultureDays(c);
+  const due=c.dueDate?new Date(c.dueDate):null;
+  const today=new Date();
+  if(due){
+    const diff=Math.ceil((due-today)/86400000);
+    if(diff<0)score-=35;
+    else if(diff<=3)score-=18;
+    else if(diff<=7)score-=8;
+  }else{
+    if(days>45)score-=30;
+    else if(days>30)score-=18;
+    else if(days>21)score-=8;
+  }
+  if(c.status==='growing_slow')score-=18;
+  if(c.status==='subcultured')score-=8;
+  const last=latestUpdate(c);
+  if(last){
+    const lastDays=Math.floor((Date.now()-new Date(last.date))/86400000);
+    if(lastDays>14)score-=12;
+    else if(lastDays>7)score-=6;
+  }else if(days>10)score-=10;
+  return Math.max(0,Math.min(100,Math.round(score)));
+}
+function healthClass(score){return score<45?'danger':score<75?'warn':'';}
+function getRecommendedAction(c){
+  if(!c)return {label:'—',cls:'action-normal'};
+  if(c.status==='contaminated')return {label:'แยก/ปิดงานและบันทึกสาเหตุ contamination',cls:'action-danger'};
+  if(c.closedDate)return {label:'Culture นี้ปิดงานแล้ว',cls:'action-normal'};
+  const days=cultureDays(c);
+  const due=c.dueDate?new Date(c.dueDate):null;
+  if(due){
+    const left=Math.ceil((due-new Date())/86400000);
+    if(left<0)return {label:'เกิน Due แล้ว: ควร Subculture/ตรวจทันที',cls:'action-danger'};
+    if(left<=3)return {label:'ใกล้ Due: เตรียมอาหารและวางแผน Subculture',cls:'action-warn'};
+  }
+  if(days>=30)return {label:'อายุเกิน 30 วัน: ตรวจและพิจารณา Subculture',cls:'action-warn'};
+  if(c.status==='growing_slow')return {label:'โตช้า: ตรวจสูตรอาหาร/แสง/อุณหภูมิ และบันทึกเพิ่ม',cls:'action-warn'};
+  return {label:'ปกติ: ติดตามต่อและอัพเดตตามรอบ',cls:'action-normal'};
+}
+function getBatchName(c){return (c.batchName||c.batch||'No Batch').trim()||'No Batch';}
+function batchStats(){
+  const groups={};
+  DB.cultures().forEach(c=>{
+    const name=getBatchName(c);
+    if(!groups[name])groups[name]=[];
+    groups[name].push(c);
+  });
+  return Object.keys(groups).sort().map(name=>{
+    const items=groups[name];
+    const active=items.filter(c=>!c.closedDate&&c.status!=='contaminated').length;
+    const contam=items.filter(c=>c.status==='contaminated').length;
+    const avg=items.length?Math.round(items.reduce((a,c)=>a+calculateHealth(c),0)/items.length):0;
+    const species=[...new Set(items.map(c=>c.plant).filter(Boolean))].slice(0,3).join(', ');
+    return {name,items,total:items.length,active,contam,avg,species};
+  });
+}
+function renderHealthBar(score){
+  return `<div class="health-wrap"><div class="health-head"><span>Health Score</span><b>${score}%</b></div><div class="health-bar"><div class="health-fill ${healthClass(score)}" style="width:${score}%"></div></div></div>`;
+}
+function renderBatchOverview(){
+  const el=document.getElementById('batchOverview'); if(!el)return;
+  const batches=batchStats().filter(b=>b.name!=='No Batch').slice(0,5);
+  if(!batches.length){el.innerHTML='<div class="empty" style="padding:18px"><div class="empty-text">ยังไม่มี Batch — เริ่มใส่ชื่อ Batch ตอนเพิ่ม Culture ใหม่</div></div>';return;}
+  el.innerHTML=batches.map(b=>`<div class="batch-card">
+    <div class="batch-name">${b.name}</div>
+    <div class="batch-meta">${b.species||'ไม่ระบุชนิดพืช'} · Avg Health ${b.avg}%</div>
+    <div class="batch-kpis">
+      <div class="batch-kpi"><b>${b.total}</b><span>Total</span></div>
+      <div class="batch-kpi"><b>${b.active}</b><span>Active</span></div>
+      <div class="batch-kpi"><b>${b.contam}</b><span>Contam</span></div>
+      <div class="batch-kpi"><b>${b.avg}%</b><span>Health</span></div>
+    </div>
+  </div>`).join('');
+}
+function getActivityFeed(limit=8){
+  const feed=[];
+  DB.cultures().forEach(c=>{
+    feed.push({date:c.startDate?c.startDate+'T00:00':'',title:`เพิ่ม ${c.plant||c.id}`,sub:`${c.id} · ${getBatchName(c)} · ${c.formula||''}`});
+    (c.updates||[]).forEach(u=>{
+      const sl={'growing_well':'โตดี','growing_normal':'โตปกติ','growing_slow':'โตช้า','contaminated':'Contaminated','subcultured':'Subcultured'}[u.status]||u.status||'Update';
+      feed.push({date:u.date,title:`อัพเดต ${c.id}: ${sl}`,sub:u.note||u.growth||`${c.plant||''} · ${getBatchName(c)}`});
+    });
+  });
+  return feed.filter(x=>x.date).sort((a,b)=>new Date(b.date)-new Date(a.date)).slice(0,limit);
+}
+function renderActivityFeed(){
+  const el=document.getElementById('activityFeed'); if(!el)return;
+  const feed=getActivityFeed(8);
+  if(!feed.length){el.innerHTML='<div style="font-size:12px;color:var(--text3)">ยังไม่มีกิจกรรม</div>';return;}
+  el.innerHTML=feed.map(f=>`<div class="feed-item"><div class="feed-dot"></div><div><div class="feed-title">${f.title}</div><div class="feed-sub">${formatDateTime(f.date)} · ${f.sub||''}</div></div></div>`).join('');
+}
+function renderProKpis(){
+  const el=document.getElementById('proKpiGrid'); if(!el)return;
+  const cultures=DB.cultures();
+  const total=cultures.length;
+  const contam=cultures.filter(c=>c.status==='contaminated').length;
+  const avg=total?Math.round(cultures.reduce((a,c)=>a+calculateHealth(c),0)/total):0;
+  const dueSoon=cultures.filter(c=>!c.closedDate&&c.dueDate&&Math.ceil((new Date(c.dueDate)-new Date())/86400000)<=3).length;
+  const batches=batchStats().filter(b=>b.name!=='No Batch').length;
+  const contamRate=total?Math.round(contam/total*100):0;
+  el.innerHTML=`
+    <div class="pro-card"><div class="pro-title">Avg Health</div><div class="pro-value">${avg}%</div></div>
+    <div class="pro-card"><div class="pro-title">Contamination Rate</div><div class="pro-value">${contamRate}%</div></div>
+    <div class="pro-card"><div class="pro-title">Due Soon</div><div class="pro-value">${dueSoon}</div></div>
+    <div class="pro-card"><div class="pro-title">Batch Count</div><div class="pro-value">${batches}</div></div>`;
+}
+function renderCompareGrowth(){
+  const el=document.getElementById('compareGrowth'); if(!el)return;
+  const list=DB.cultures().map(c=>({c,score:calculateHealth(c),last:latestUpdate(c)})).sort((a,b)=>b.score-a.score);
+  if(list.length<2){el.innerHTML='<div class="card" style="font-size:12px;color:var(--text3)">ต้องมีอย่างน้อย 2 culture เพื่อเปรียบเทียบ</div>';return;}
+  const best=list[0], watch=list[list.length-1];
+  el.innerHTML=`<div class="card compare-row">
+    <div class="compare-box"><div style="font-size:11px;color:var(--text3)">Best</div><b>${best.c.id}</b><div style="font-size:12px">${best.c.plant||''}</div>${renderHealthBar(best.score)}</div>
+    <div style="font-size:18px;color:var(--text3)">VS</div>
+    <div class="compare-box"><div style="font-size:11px;color:var(--text3)">Watch</div><b>${watch.c.id}</b><div style="font-size:12px">${watch.c.plant||''}</div>${renderHealthBar(watch.score)}</div>
+  </div>`;
 }
 
 // ──────────────────────────────────────────────
@@ -1456,8 +1676,6 @@ function renderAnalytics(){
       <div class="stat-card"><div class="stat-num stat-accent">${shootCount?( shootTotal/shootCount).toFixed(1):'—'}</div><div class="stat-label">ความยาวต้นเฉลี่ย (cm)</div></div>
       <div class="stat-card"><div class="stat-num" style="color:var(--warn)">${rootCount?(rootTotal/rootCount).toFixed(1):'—'}</div><div class="stat-label">ความยาวรากเฉลี่ย (cm)</div></div>
     </div>`;
-  renderMultiplicationRate();
-  renderPredictiveAnalytics();
   renderCompareGrowth();
 }
 
@@ -1694,6 +1912,9 @@ function renderDashboard(){
     alertsHtml+=`<div class="alert alert-warn"><svg class="alert-icon" viewBox="0 0 18 18" fill="none" stroke="var(--warn)" stroke-width="1.7"><circle cx="9" cy="9" r="7"/><path d="M9 5v5M9 13v.01" stroke-linecap="round"/></svg><div><div class="alert-title">${c.id} ใกล้ Due (${days} วัน)</div><div class="alert-body">${c.plant} · ${c.formula}</div></div></div>`;
   });
   document.getElementById('alertsSection').innerHTML=alertsHtml?`<div>${alertsHtml}</div>`:'';
+  renderProKpis();
+  renderBatchOverview();
+  renderActivityFeed();
 
   const recent=cultures.slice(-4).reverse();
   document.getElementById('recentCultures').innerHTML=recent.map(c=>cultureCardHTML(c)).join('');
@@ -1749,12 +1970,15 @@ function cultureCardHTML(c){
   const statusLabel={'growing_well':'โตดี','growing_normal':'โตปกติ','growing_slow':'โตช้า','contaminated':'Contaminated','subcultured':'Subcultured'}[c.status]||c.status;
   const badgeClass={'growing_well':'b-good','growing_normal':'b-norm','growing_slow':'b-slow','contaminated':'b-cont','subcultured':'b-sub'}[c.status]||'b-close';
   const lastUpdate=c.updates&&c.updates.length?c.updates[c.updates.length-1]:null;
+  const health=calculateHealth(c);
+  const action=getRecommendedAction(c);
   return `<div class="culture-card" onclick="showDetail('${c.id}')">
     <div class="cc-header">
       <div>
         <div class="cc-id">${c.id}</div>
         <div class="cc-name">${c.plant}</div>
         <div class="cc-meta">${c.explant} · ${c.formula}${c.operator?' · '+c.operator:''}</div>
+        <div class="cc-meta">Batch: ${getBatchName(c)} · Cycle ${c.cycle??c.subnum??0}</div>
       </div>
       <span class="badge ${badgeClass}">${statusLabel}</span>
     </div>
@@ -1762,6 +1986,8 @@ function cultureCardHTML(c){
       <span class="duration-chip">${c.closedDate?'ปิดแล้ว ':''} ${days} วัน</span>
       <span style="font-size:11px;color:var(--text3)">${lastUpdate?'อัพเดต '+formatRelDate(lastUpdate.date):'เริ่ม '+formatDate(c.startDate)}</span>
     </div>
+    ${renderHealthBar(health)}
+    <div class="action-box ${action.cls}">${action.label}</div>
     ${dueDate&&!c.closedDate?`<div class="prog"><div class="prog-fill ${progClass}" style="width:${prog}%"></div></div>`:''}
   </div>`;
 }
@@ -1784,6 +2010,8 @@ function showDetail(id){
   const end=c.closedDate?new Date(c.closedDate):today;
   const days=Math.floor((end-start)/86400000);
   const lastU=c.updates&&c.updates.length?c.updates[c.updates.length-1]:null;
+  const health=calculateHealth(c);
+  const action=getRecommendedAction(c);
 
   // Photos
   const allPhotos=[...(c.photos||[]),...(c.updates||[]).flatMap(u=>(u.photos||[]).map(p=>({...p,updateDate:u.date})))];
@@ -1799,6 +2027,8 @@ function showDetail(id){
       <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px">
         <span class="badge b-norm">${c.explant}</span>
         <span style="background:var(--purple-light);color:#4c1d95" class="badge">${c.formula}</span>
+        <span style="background:var(--info-light);color:var(--info-text)" class="badge">Batch ${getBatchName(c)}</span>
+        <span style="background:var(--bg2);color:var(--text2)" class="badge">Cycle ${c.cycle??c.subnum??0}</span>
         ${(c.tags||[]).map(t=>`<span style="background:var(--bg2);color:var(--text2)" class="badge">${t}</span>`).join('')}
       </div>
     </div>
@@ -1814,6 +2044,8 @@ function showDetail(id){
         ${lastU&&lastU.shoots!==undefined?`<div><div style="font-size:10px;color:var(--text3);margin-bottom:2px">ยอด (ล่าสุด)</div><div style="font-size:13px;font-weight:500">${lastU.shoots} ยอด</div></div>`:''}
         ${lastU&&lastU.roots!==undefined?`<div><div style="font-size:10px;color:var(--text3);margin-bottom:2px">ราก (ล่าสุด)</div><div style="font-size:13px;font-weight:500">${lastU.roots} ราก</div></div>`:''}
       </div>
+      ${renderHealthBar(health)}
+      <div class="action-box ${action.cls}"><b>Recommended Action:</b> ${action.label}</div>
       ${c.note?`<div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--border);font-size:12px;color:var(--text2)">${c.note}</div>`:''}
     </div>`;
 
@@ -1880,7 +2112,7 @@ function showDetail(id){
 // ADD / EDIT CULTURE
 // ──────────────────────────────────────────────
 function resetAddForm(){
-  ['f_plant','f_explant','f_formula','f_operator','f_tags','f_note','f_subnum','f_parent'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
+  ['f_plant','f_explant','f_formula','f_operator','f_tags','f_note','f_subnum','f_parent','f_batch','f_cycle'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
   setDefaultDates();
   pendingPhotosAdd=[];
   document.getElementById('addPhotosPreview').innerHTML='';
@@ -1904,11 +2136,15 @@ function editCulture(id){
     document.getElementById('f_note').value=c.note||'';
     document.getElementById('f_subnum').value=c.subnum||0;
     document.getElementById('f_parent').value=c.parentId||'';
+    document.getElementById('f_batch').value=c.batchName||c.batch||'';
+    document.getElementById('f_cycle').value=c.cycle??c.subnum??0;
     document.getElementById('f_formula').value=c.formula;
   },50);
 }
 
 async function saveCulture(){
+  if(editMode&&currentDetailId){const old=DB.allCultures().find(x=>x.id===currentDetailId);if(!canEditItem(old,'cultures')){showToast('บัญชีนี้ไม่มีสิทธิ์แก้ไข Culture นี้');return;}}
+  if(!editMode&&!can('addCultures')){showToast('บัญชีนี้ไม่มีสิทธิ์เพิ่ม Culture');return;}
   const plant=document.getElementById('f_plant').value.trim();
   const explant=document.getElementById('f_explant').value;
   const formula=document.getElementById('f_formula').value;
@@ -1917,22 +2153,26 @@ async function saveCulture(){
   const subnumRaw=document.getElementById('f_subnum').value;
   const subnum=subnumRaw!==''?parseInt(subnumRaw):0;
   const parentId=document.getElementById('f_parent').value||null;
+  const batchName=document.getElementById('f_batch').value.trim();
+  const cycleRaw=document.getElementById('f_cycle').value;
+  const cycle=cycleRaw!==''?parseInt(cycleRaw):subnum;
   showToast('กำลังบันทึก...');
   if(editMode&&currentDetailId){
     const c=DB.allCultures().find(x=>x.id===currentDetailId);
-    if(!canEditItem(c,'cultures')){showToast('บัญชีนี้ไม่มีสิทธิ์แก้ไข Culture นี้');return;}
     if(c){
-      const updated={...c,plant,explant,formula,startDate,dueDate:document.getElementById('f_duedate').value||null,operator:document.getElementById('f_operator').value.trim(),tags:document.getElementById('f_tags').value.trim().split(/\s+/).filter(Boolean),note:document.getElementById('f_note').value.trim(),subnum,parentId};
+      const updated={...c,ownerId:c.ownerId||currentUser?.id||'',ownerName:c.ownerName||currentUser?.name||'',plant,explant,formula,startDate,dueDate:document.getElementById('f_duedate').value||null,operator:document.getElementById('f_operator').value.trim(),tags:document.getElementById('f_tags').value.trim().split(/\s+/).filter(Boolean),note:document.getElementById('f_note').value.trim(),subnum,parentId,batchName,cycle};
       if(pendingPhotosAdd.length)updated.photos=[...(c.photos||[]),...pendingPhotosAdd];
       await DB.saveCulture(updated);
+      if(batchName){await DB.saveBatch({id:'batch_'+batchName.replace(/[^a-zA-Z0-9ก-๙_-]+/g,'_')+'_'+Date.now(),name:batchName,species:plant,formula,createdAt:startDate,owner:document.getElementById('f_operator').value.trim(),note:''});}
     }
     editMode=false;
     showToast('แก้ไขสำเร็จ');
     showDetail(currentDetailId);
   } else {
     const id=DB.nextCultureId();
-    const newC={id,ownerId:currentUser?.id||'',ownerName:currentUser?.name||'',plant,explant,formula,startDate,dueDate:document.getElementById('f_duedate').value||null,operator:document.getElementById('f_operator').value.trim(),tags:document.getElementById('f_tags').value.trim().split(/\s+/).filter(Boolean),note:document.getElementById('f_note').value.trim(),status:'growing_normal',closedDate:null,updates:[],photos:pendingPhotosAdd.slice(),subnum,parentId};
+    const newC={id,ownerId:currentUser?.id||'',ownerName:currentUser?.name||'',plant,explant,formula,startDate,dueDate:document.getElementById('f_duedate').value||null,operator:document.getElementById('f_operator').value.trim(),tags:document.getElementById('f_tags').value.trim().split(/\s+/).filter(Boolean),note:document.getElementById('f_note').value.trim(),status:'growing_normal',closedDate:null,updates:[],photos:pendingPhotosAdd.slice(),subnum,parentId,batchName,cycle};
     await DB.saveCulture(newC);
+    if(batchName){await DB.saveBatch({id:'batch_'+batchName.replace(/[^a-zA-Z0-9ก-๙_-]+/g,'_')+'_'+Date.now(),name:batchName,species:plant,formula,createdAt:startDate,owner:document.getElementById('f_operator').value.trim(),note:''});}
     pendingPhotosAdd=[];
     showToast('บันทึก Culture '+id+' สำเร็จ');
     showPage('list');
@@ -1953,6 +2193,8 @@ async function deleteCulture(id){
 // ──────────────────────────────────────────────
 function openUpdateModal(id){
   currentDetailId=id;
+  const target=DB.allCultures().find(x=>x.id===id);
+  if(!canEditItem(target,'cultures')){showToast('บัญชีนี้ไม่มีสิทธิ์อัปเดต Culture นี้');return;}
   const c=DB.cultures().find(x=>x.id===id);
   if(c){document.getElementById('u_status').value=c.status||'growing_normal';}
   ['u_shoots','u_roots','u_shootLen','u_rootLen','u_growth','u_note','u_closedate'].forEach(id=>document.getElementById(id).value='');
@@ -1962,6 +2204,7 @@ function openUpdateModal(id){
 }
 
 async function saveUpdate(){
+  const target=DB.allCultures().find(x=>x.id===currentDetailId);if(!canEditItem(target,'cultures')){showToast('บัญชีนี้ไม่มีสิทธิ์อัปเดต Culture นี้');return;}
   const id=currentDetailId;
   const c=DB.cultures().find(x=>x.id===id);
   if(!c)return;
@@ -2151,13 +2394,21 @@ function renderSettings(){
   roleEl.textContent=currentUser.role==='admin'?'Admin':'User';
   roleEl.className='user-role '+(currentUser.role==='admin'?'role-admin':'role-user');
 
-  if(currentUser.role==='admin'){
-    document.getElementById('adminSection').classList.remove('hidden');
-    renderUserManagement();
-    renderFormulaList();
-    renderPlantList();
+  const adminSection=document.getElementById('adminSection');
+  const showAdminTools=can('manageUsers')||can('managePlants')||can('manageFormulas');
+  adminSection.classList.toggle('hidden',!showAdminTools);
+  if(showAdminTools){
+    const pendingEl=document.getElementById('pendingUsers');
+    const allUsersEl=document.getElementById('allUsers');
+    if(can('manageUsers')){renderUserManagement();}else{if(pendingEl)pendingEl.innerHTML='';if(allUsersEl)allUsersEl.innerHTML='';}
+    const plantList=document.getElementById('plantList');
+    const formulaList=document.getElementById('formulaList');
+    if(can('managePlants'))renderPlantList();else if(plantList)plantList.innerHTML='<div style="font-size:12px;color:var(--text3);padding:8px 0">ไม่มีสิทธิ์จัดการชนิดพืช</div>';
+    if(can('manageFormulas'))renderFormulaList();else if(formulaList)formulaList.innerHTML='<div style="font-size:12px;color:var(--text3);padding:8px 0">ไม่มีสิทธิ์จัดการสูตรอาหาร</div>';
   }
   renderNotesList();
+  const noteBtn=document.querySelector('button[onclick="openNoteModal()"]');
+  if(noteBtn)noteBtn.style.display=can('editNotes')?'block':'none';
 }
 
 function renderUserManagement(){
@@ -2191,29 +2442,22 @@ function renderUserManagement(){
     } else {
       actions=`<span style="font-size:10px;color:var(--text3);padding:4px">ปกป้อง</span>`;
     }
-    return `<div class="user-item" style="flex-wrap:wrap">
+    return `<div class="user-item">
       <div class="user-avatar" style="background:var(--accent-light);color:var(--accent-text)">${u.avatar||u.name[0]}</div>
-      <div style="flex:1;min-width:0">
-        <div class="user-name">${u.name}${isSA?` <span style="font-size:9px;background:var(--info-light);color:var(--info-text);padding:1px 5px;border-radius:4px;margin-left:4px">ผู้ดูแลหลัก</span>`:''}
-        </div>
-        <div style="font-size:11px;color:var(--text3)">${u.email}</div>
-        <span class="user-role ${roleClass}">${roleLabel}</span>
-        ${(!isSA&&u.role!=='admin')?`
-        <div style="margin-top:8px;padding-top:8px;border-top:1px solid var(--border)">
-          <div style="font-size:10px;font-weight:600;color:var(--text3);margin-bottom:4px;letter-spacing:.4px">🔐 สิทธิ์การใช้งาน</div>
-          <div style="display:grid;grid-template-columns:1fr 1fr;gap:0">
-            ${permissionCheckbox(u,'viewAllCultures','เห็นข้อมูลทุกคน')}
-            ${permissionCheckbox(u,'addCultures','เพิ่ม Culture')}
-            ${permissionCheckbox(u,'editCultures','แก้ไข Culture')}
-            ${permissionCheckbox(u,'deleteCultures','ลบ Culture')}
-            ${permissionCheckbox(u,'managePlants','จัดการชนิดพืช')}
-            ${permissionCheckbox(u,'manageFormulas','จัดการสูตรอาหาร')}
-            ${permissionCheckbox(u,'viewNotes','ดูบันทึก')}
-            ${permissionCheckbox(u,'editNotes','เพิ่ม/แก้บันทึก')}
-            ${permissionCheckbox(u,'manageLabTools','จัดการแล็บ')}
-          </div>
-        </div>`:''}
-      </div>
+      <div style="flex:1"><div class="user-name">${u.name}${isSA?` <span style="font-size:9px;background:var(--info-light);color:var(--info-text);padding:1px 5px;border-radius:4px;margin-left:4px">ผู้ดูแลหลัก</span>`:''}
+      </div><div style="font-size:11px;color:var(--text3)">${u.email}</div>
+      <span class="user-role ${roleClass}">${roleLabel}</span>
+      ${(!isSA&&u.role!=='admin')?`<div style="margin-top:6px;display:grid;grid-template-columns:1fr 1fr;gap:0 10px">
+        ${permissionCheckbox(u,'viewAllCultures','เห็นข้อมูลทุกคน')}
+        ${permissionCheckbox(u,'addCultures','เพิ่ม Culture')}
+        ${permissionCheckbox(u,'editCultures','แก้ไข Culture')}
+        ${permissionCheckbox(u,'deleteCultures','ลบ Culture')}
+        ${permissionCheckbox(u,'managePlants','จัดการชนิดพืช')}
+        ${permissionCheckbox(u,'manageFormulas','จัดการสูตรอาหาร')}
+        ${permissionCheckbox(u,'viewNotes','เห็นบันทึก')}
+        ${permissionCheckbox(u,'editNotes','เพิ่ม/แก้บันทึก')}
+        ${permissionCheckbox(u,'manageLabTools','จัดการแล็บ')}
+      </div>`:''}</div>
       ${actions}
     </div>`;
   }).join('');
@@ -2265,7 +2509,7 @@ async function adminAddUser(){
   if(!name||!email||!pass){showToast('กรุณากรอกข้อมูลให้ครบ');return;}
   if(pass.length<6){showToast('รหัสผ่านต้องมีอย่างน้อย 6 ตัวอักษร');return;}
   if(DB.users().find(u=>(u.email||"").toLowerCase()===email.toLowerCase())){showToast('อีเมลนี้ถูกใช้งานแล้ว');return;}
-  const newUser={id:'u'+Date.now(),name,email,pass,role,approved:true,avatar:name[0]};
+  const newUser={id:'u'+Date.now(),name,email,pass,role,approved:true,avatar:name[0],permissions: role==='admin'?{}:{...DEFAULT_PERMISSIONS}};
   await DB.saveUser(newUser);
   document.getElementById('adminNewName').value='';
   document.getElementById('adminNewEmail').value='';
@@ -2275,7 +2519,7 @@ async function adminAddUser(){
   renderUserManagement();
 }
 async function doRegisterFirestore(name,email,pass){
-  const newUser={id:'u'+Date.now(),name,email,pass,role:'user',approved:false,avatar:name[0]};
+  const newUser={id:'u'+Date.now(),name,email,pass,role:'user',approved:false,avatar:name[0],permissions:{...DEFAULT_PERMISSIONS}};
   await DB.saveUser(newUser);
 }
 
@@ -2297,7 +2541,8 @@ async function addFormula(){
   const name=document.getElementById('newFormulaName').value.trim();
   const desc=document.getElementById('newFormulaDesc').value.trim();
   if(!name){showToast('กรุณากรอกชื่อสูตร');return;}
-  if(DB.formulas().find(f=>(f.name||'').toLowerCase()===name.toLowerCase())){showToast('ชื่อสูตรซ้ำ');return;}
+  const formulas=DB.formulas();
+  if(formulas.find(f=>(f.name||'').toLowerCase()===name.toLowerCase())){showToast('ชื่อสูตรซ้ำ');return;}
   await DB.saveFormula({id:'f'+Date.now(),name,desc,updatedAt:Date.now()});
   document.getElementById('newFormulaName').value='';
   document.getElementById('newFormulaDesc').value='';
@@ -2369,19 +2614,18 @@ function renderNotesList(){
       <div style="flex:1;min-width:0">
         <div style="font-size:14px;font-weight:600;color:var(--text);margin-bottom:4px">${(n.title||'ไม่มีชื่อ').replace(/</g,'&lt;')}</div>
         <div style="font-size:12px;color:var(--text2);white-space:pre-wrap;line-height:1.5;max-height:60px;overflow:hidden">${(n.content||'').replace(/</g,'&lt;').substring(0,200)}</div>
-        <div style="font-size:10px;color:var(--text3);margin-top:6px">${n.ownerName?'โดย '+n.ownerName+' · ':''} ${n.updatedAt?formatDateTime(new Date(n.updatedAt).toISOString().slice(0,16)):''}</div>
+        <div style="font-size:10px;color:var(--text3);margin-top:6px">${n.updatedAt?formatDateTime(new Date(n.updatedAt).toISOString().slice(0,16)):''}</div>
       </div>
-      ${canEditItem(n,'notes')?`<button onclick="event.stopPropagation();deleteNote('${n.id}')" style="color:var(--danger);font-size:11px;padding:4px 8px;background:var(--danger-light);border:none;border-radius:6px;cursor:pointer;flex-shrink:0">ลบ</button>`:''}
+      <button onclick="event.stopPropagation();deleteNote('${n.id}')" style="color:var(--danger);font-size:11px;padding:4px 8px;background:var(--danger-light);border:none;border-radius:6px;cursor:pointer;flex-shrink:0">ลบ</button>
     </div>
   </div>`).join(''):'<div style="font-size:12px;color:var(--text3);padding:8px 0">ยังไม่มีบันทึก</div>';
 }
 
 let currentNoteId=null;
 function openNoteModal(id){
-  if(id&&!canEditItem(DB.allNotes().find(n=>n.id===id),'notes')){showToast('บัญชีนี้ไม่มีสิทธิ์แก้ไขบันทึกนี้');return;}
-  if(!id&&!can('editNotes')){showToast('บัญชีนี้ไม่มีสิทธิ์เพิ่มบันทึก');return;}
+  if(!can('editNotes')){showToast('บัญชีนี้ไม่มีสิทธิ์เพิ่ม/แก้บันทึก');return;}
   currentNoteId=id||null;
-  const note=id?DB.allNotes().find(n=>n.id===id):null;
+  const note=id?DB.notes().find(n=>n.id===id):null;
   document.getElementById('noteTitle').value=note?note.title||'':'';
   document.getElementById('noteContent').value=note?note.content||'':'';
   document.getElementById('noteModal').classList.remove('hidden');
@@ -2392,7 +2636,6 @@ async function saveNote(){
   const title=document.getElementById('noteTitle').value.trim();
   const content=document.getElementById('noteContent').value.trim();
   if(!title&&!content){showToast('กรุณากรอกข้อมูล');return;}
-  // คงค่า ownerId เดิมถ้าเป็นการแก้ไข
   const old=currentNoteId?DB.allNotes().find(n=>n.id===currentNoteId):null;
   const n={id:currentNoteId||'n'+Date.now(),ownerId:old?.ownerId||currentUser?.id||'',ownerName:old?.ownerName||currentUser?.name||'',title,content,updatedAt:Date.now()};
   await DB.saveNote(n);
@@ -2402,8 +2645,7 @@ async function saveNote(){
 }
 
 async function deleteNote(id){
-  const n=DB.allNotes().find(x=>x.id===id);
-  if(!canEditItem(n,'notes')){showToast('บัญชีนี้ไม่มีสิทธิ์ลบบันทึกนี้');return;}
+  const n=DB.allNotes().find(x=>x.id===id);if(!canEditItem(n,'notes')){showToast('บัญชีนี้ไม่มีสิทธิ์ลบบันทึกนี้');return;}
   if(!confirm('ลบบันทึกนี้ใช่ไหม?'))return;
   await DB.deleteNoteById(id);
   renderNotesList();
@@ -2421,347 +2663,6 @@ function toggleDarkMode(el){
   document.documentElement.style.setProperty('--text',el.classList.contains('on')?'#f0ede8':'#1a1917');
   document.documentElement.style.setProperty('--text2',el.classList.contains('on')?'#9a9690':'#6b6760');
   document.documentElement.style.setProperty('--text3',el.classList.contains('on')?'#666360':'#9c9890');
-}
-
-// ──────────────────────────────────────────────
-// PDF REPORT GENERATOR (ข้อ 2)
-// ──────────────────────────────────────────────
-function generatePDFReport(){
-  showToast('กำลังสร้างรายงาน PDF...');
-  const cultures = DB.cultures();
-  const today = new Date();
-  const dateStr = formatDate(today.toISOString().slice(0,10));
-  const labName = currentUser?.name || 'Tissue Me Chua Lab';
-
-  // Stats
-  const total = cultures.length;
-  const active = cultures.filter(c=>!c.closedDate).length;
-  const cont = cultures.filter(c=>c.status==='contaminated').length;
-  const well = cultures.filter(c=>c.status==='growing_well').length;
-  const contRate = total ? Math.round(cont/total*100) : 0;
-  const successRate = total ? Math.round(well/total*100) : 0;
-  const avgHealth = total ? Math.round(cultures.reduce((a,c)=>a+calculateHealth(c),0)/total) : 0;
-
-  // Multiplication rate per formula
-  const multiByFormula = calcMultiplicationRates();
-
-  // Cultures table rows
-  const tableRows = cultures.map(c=>{
-    const last = c.updates&&c.updates.length ? c.updates[c.updates.length-1] : null;
-    const statusTh = {'growing_well':'โตดี','growing_normal':'โตปกติ','growing_slow':'โตช้า','contaminated':'Contaminated','subcultured':'Subcultured'}[c.status]||c.status;
-    const health = calculateHealth(c);
-    return `<tr>
-      <td style="font-family:monospace;font-size:10px">${c.id}</td>
-      <td>${c.plant}</td>
-      <td>${c.formula}</td>
-      <td>${getBatchName(c)}</td>
-      <td>${formatDate(c.startDate)}</td>
-      <td>${c.dueDate?formatDate(c.dueDate):'—'}</td>
-      <td><span style="color:${c.status==='growing_well'?'#1b4332':c.status==='contaminated'?'#7f1d1d':'#92400e'}">${statusTh}</span></td>
-      <td>${health}%</td>
-      <td>${last?last.shoots||0:'—'}</td>
-      <td>${last?last.shootLen||0:'—'}</td>
-    </tr>`;
-  }).join('');
-
-  // Multi rate rows
-  const multiRows = multiByFormula.map(m=>`<tr>
-    <td>${m.formula}</td>
-    <td>${m.avgShoots.toFixed(1)}</td>
-    <td>${m.avgLen.toFixed(1)}</td>
-    <td><b>${m.mr.toFixed(2)}x</b></td>
-    <td>${m.count}</td>
-    <td>${m.contRate}%</td>
-  </tr>`).join('');
-
-  // Temp summary
-  const temps = DB.temps();
-  const recentTemps = temps.slice(-30);
-  const avgTemp = recentTemps.length ? (recentTemps.reduce((a,t)=>a+(t.temp||0),0)/recentTemps.length).toFixed(1) : '—';
-  const maxTemp = recentTemps.length ? Math.max(...recentTemps.map(t=>t.temp||0)).toFixed(1) : '—';
-  const minTemp = recentTemps.length ? Math.min(...recentTemps.map(t=>t.temp||0)).toFixed(1) : '—';
-
-  const html = `<!DOCTYPE html>
-<html lang="th"><head><meta charset="UTF-8">
-<style>
-  body{font-family:'Sarabun','TH Sarabun New',Arial,sans-serif;margin:0;padding:20px;color:#1a1917;font-size:13px;line-height:1.6}
-  .header{background:#2d6a4f;color:#fff;padding:20px 24px;border-radius:8px;margin-bottom:20px;display:flex;justify-content:space-between;align-items:flex-start}
-  .header h1{font-size:20px;margin:0 0 4px}
-  .header p{margin:0;font-size:12px;opacity:.8}
-  .kpi-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:20px}
-  .kpi{background:#f0fdf4;border:1px solid #86efac;border-radius:8px;padding:12px;text-align:center}
-  .kpi-num{font-size:24px;font-weight:700;color:#1b4332}
-  .kpi-label{font-size:11px;color:#6b7280;margin-top:2px}
-  h2{font-size:14px;font-weight:700;color:#2d6a4f;margin:20px 0 8px;border-bottom:2px solid #d8f3dc;padding-bottom:4px}
-  table{width:100%;border-collapse:collapse;font-size:11px;margin-bottom:16px}
-  th{background:#f0fdf4;padding:7px 8px;text-align:left;font-weight:600;color:#1b4332;border-bottom:2px solid #86efac}
-  td{padding:6px 8px;border-bottom:1px solid #e5e7eb}
-  tr:nth-child(even){background:#f9fafb}
-  .footer{margin-top:24px;font-size:10px;color:#9c9890;text-align:center;border-top:1px solid #e5e7eb;padding-top:12px}
-  .temp-row{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-bottom:16px}
-  .temp-card{background:#fff7ed;border:1px solid #fed7aa;border-radius:8px;padding:10px;text-align:center}
-  .temp-num{font-size:20px;font-weight:700;color:#9a3412}
-  .warn-box{background:#fef3c7;border:1px solid #fcd34d;border-radius:6px;padding:10px;margin-bottom:8px;font-size:12px}
-  @media print{body{padding:10px}.header{-webkit-print-color-adjust:exact;print-color-adjust:exact}}
-</style></head><body>
-<div class="header">
-  <div>
-    <h1>🌿 รายงานผลการทดลอง — Tissue Me Chua Lab</h1>
-    <p>จัดทำโดย: ${labName} &nbsp;|&nbsp; วันที่: ${dateStr} &nbsp;|&nbsp; ข้อมูลทั้งหมด ${total} culture</p>
-  </div>
-  <div style="text-align:right;font-size:12px;opacity:.8">
-    <div>Avg Health: ${avgHealth}%</div>
-    <div>Success Rate: ${successRate}%</div>
-  </div>
-</div>
-
-<div class="kpi-grid">
-  <div class="kpi"><div class="kpi-num">${total}</div><div class="kpi-label">ทั้งหมด</div></div>
-  <div class="kpi"><div class="kpi-num">${active}</div><div class="kpi-label">กำลังเลี้ยง</div></div>
-  <div class="kpi"><div class="kpi-num" style="color:${contRate>20?'#7f1d1d':'#1b4332'}">${contRate}%</div><div class="kpi-label">Contamination Rate</div></div>
-  <div class="kpi"><div class="kpi-num">${avgHealth}%</div><div class="kpi-label">Avg Health Score</div></div>
-</div>
-
-<h2>📊 อัตราการขยายพันธุ์ (Multiplication Rate) แยกตามสูตรอาหาร</h2>
-<table>
-  <tr><th>สูตรอาหาร</th><th>ยอดเฉลี่ย</th><th>ความยาวเฉลี่ย(cm)</th><th>MR</th><th>จำนวน</th><th>Contam%</th></tr>
-  ${multiRows||'<tr><td colspan="6" style="color:#9c9890;text-align:center">ยังไม่มีข้อมูลเพียงพอ</td></tr>'}
-</table>
-
-<h2>🌡️ สรุปอุณหภูมิ (30 รายการล่าสุด)</h2>
-<div class="temp-row">
-  <div class="temp-card"><div class="temp-num">${avgTemp}°C</div><div style="font-size:11px;color:#9a3412">เฉลี่ย</div></div>
-  <div class="temp-card"><div class="temp-num">${maxTemp}°C</div><div style="font-size:11px;color:#9a3412">สูงสุด</div></div>
-  <div class="temp-card"><div class="temp-num">${minTemp}°C</div><div style="font-size:11px;color:#9a3412">ต่ำสุด</div></div>
-</div>
-
-<h2>🌱 รายการ Culture ทั้งหมด</h2>
-<table>
-  <tr><th>ID</th><th>ชนิดพืช</th><th>สูตร</th><th>Batch</th><th>เริ่ม</th><th>Due</th><th>สถานะ</th><th>Health</th><th>ยอด</th><th>ต้น(cm)</th></tr>
-  ${tableRows}
-</table>
-
-<div class="footer">
-  รายงานนี้สร้างอัตโนมัติจากระบบ Tissue Me Chua Lab — ${new Date().toLocaleString('th-TH')} — ข้อมูลสงวนลิขสิทธิ์
-</div>
-<${'script'}>window.onload=function(){window.print();}</${'script'}>
-</body></html>`;
-
-  const blob = new Blob([html], {type:'text/html;charset=utf-8'});
-  const url = URL.createObjectURL(blob);
-  const win = window.open(url,'_blank');
-  if(!win){
-    const a = document.createElement('a');
-    a.href = url; a.download = `TissueMeChua_Report_${new Date().toISOString().slice(0,10)}.html`;
-    document.body.appendChild(a); a.click(); document.body.removeChild(a);
-  }
-  setTimeout(()=>URL.revokeObjectURL(url), 5000);
-  showToast('รายงาน PDF พร้อมแล้ว — กด Print/Save as PDF ครับ');
-}
-
-// ──────────────────────────────────────────────
-// MULTIPLICATION RATE (ข้อ 5)
-// ──────────────────────────────────────────────
-function calcMultiplicationRates(){
-  const cultures = DB.cultures();
-  const byFormula = {};
-  cultures.forEach(c=>{
-    const f = c.formula||'ไม่ระบุ';
-    if(!byFormula[f]) byFormula[f] = {cultures:[], shoots:[], lens:[], cont:0};
-    byFormula[f].cultures.push(c);
-    (c.updates||[]).forEach(u=>{
-      if(u.shoots>0) byFormula[f].shoots.push(u.shoots);
-      if(u.shootLen>0) byFormula[f].lens.push(u.shootLen);
-    });
-    if(c.status==='contaminated') byFormula[f].cont++;
-  });
-  return Object.keys(byFormula).map(f=>{
-    const d = byFormula[f];
-    const avgShoots = d.shoots.length ? d.shoots.reduce((a,v)=>a+v,0)/d.shoots.length : 0;
-    const avgLen = d.lens.length ? d.lens.reduce((a,v)=>a+v,0)/d.lens.length : 0;
-    // MR = average shoots per explant (simplified)
-    const mr = avgShoots > 0 ? avgShoots : (d.cultures.length ? 1.0 : 0);
-    const contRate = d.cultures.length ? Math.round(d.cont/d.cultures.length*100) : 0;
-    return {formula:f, avgShoots, avgLen, mr, count:d.cultures.length, contRate};
-  }).sort((a,b)=>b.mr-a.mr);
-}
-
-function renderMultiplicationRate(){
-  const el = document.getElementById('multiRateSection');
-  if(!el) return;
-  const data = calcMultiplicationRates();
-  if(!data.length){el.innerHTML='<div class="card" style="font-size:12px;color:var(--text3)">ยังไม่มีข้อมูลเพียงพอ — ต้องบันทึกจำนวนยอดในการ Update ก่อน</div>';return;}
-  const best = data[0];
-  el.innerHTML = `
-    <div class="card" style="margin-bottom:8px;background:var(--accent-light);border-color:#95d5b2">
-      <div style="font-size:11px;color:var(--accent-text);margin-bottom:4px;font-weight:600">🏆 สูตรที่ดีที่สุด: ${best.formula}</div>
-      <div style="font-size:22px;font-weight:700;color:var(--accent)">${best.mr.toFixed(2)}x</div>
-      <div style="font-size:11px;color:var(--accent-text)">Multiplication Rate · ${best.avgShoots.toFixed(1)} ยอด/explant เฉลี่ย</div>
-    </div>
-    ${data.map(d=>`
-    <div class="card" style="margin-bottom:6px">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
-        <div style="font-size:13px;font-weight:600">${d.formula}</div>
-        <div style="font-size:16px;font-weight:700;color:var(--accent)">${d.mr.toFixed(2)}x</div>
-      </div>
-      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px;font-size:10px;color:var(--text3)">
-        <div><div style="font-weight:600;color:var(--text);font-size:12px">${d.avgShoots.toFixed(1)}</div>ยอดเฉลี่ย</div>
-        <div><div style="font-weight:600;color:var(--text);font-size:12px">${d.avgLen.toFixed(1)}cm</div>ความยาว</div>
-        <div><div style="font-weight:600;color:var(--text);font-size:12px">${d.count}</div>Culture</div>
-        <div><div style="font-weight:600;color:${d.contRate>20?'var(--danger)':'var(--text)'};font-size:12px">${d.contRate}%</div>Contam</div>
-      </div>
-      <div class="health-bar" style="margin-top:6px"><div class="health-fill" style="width:${Math.min(100,d.mr*20)}%;background:var(--accent)"></div></div>
-    </div>`).join('')}`;
-}
-
-// ──────────────────────────────────────────────
-// PREDICTIVE ANALYTICS (ข้อ 8)
-// ──────────────────────────────────────────────
-function renderPredictiveAnalytics(){
-  const el = document.getElementById('predictiveSection');
-  if(!el) return;
-  const cultures = DB.cultures().filter(c=>!c.closedDate);
-  const today = new Date();
-  const predictions = [];
-
-  cultures.forEach(c=>{
-    const health = calculateHealth(c);
-    const days = cultureDays(c);
-    const last = latestUpdate(c);
-    const lastUpdateDays = last ? Math.floor((Date.now()-new Date(last.date))/86400000) : days;
-
-    // ทำนายความเสี่ยง Contamination
-    let contRisk = 0;
-    if(days > 35) contRisk += 30;
-    else if(days > 25) contRisk += 15;
-    if(lastUpdateDays > 14) contRisk += 20;
-    if(c.status === 'growing_slow') contRisk += 15;
-    // เปรียบเทียบกับ contamination rate ของสูตรนั้น
-    const formulaData = calcMultiplicationRates().find(m=>m.formula===c.formula);
-    if(formulaData && formulaData.contRate > 30) contRisk += 20;
-    contRisk = Math.min(95, contRisk);
-
-    // ทำนายวัน Subculture ที่เหมาะสม
-    let daysToSubculture = null;
-    if(c.dueDate){
-      daysToSubculture = Math.ceil((new Date(c.dueDate)-today)/86400000);
-    } else if(last && last.shoots >= 3){
-      // ถ้ามียอดมากพอ แนะนำ subculture ใน 7-14 วัน
-      daysToSubculture = 10;
-    } else if(days >= 28){
-      daysToSubculture = 5;
-    }
-
-    // ทำนายการเจริญเติบโต
-    let growthTrend = 'stable';
-    if(c.updates && c.updates.length >= 2){
-      const updates = c.updates.slice(-2);
-      const diff = (updates[1].shootLen||0) - (updates[0].shootLen||0);
-      if(diff > 0.5) growthTrend = 'up';
-      else if(diff < -0.1) growthTrend = 'down';
-    }
-
-    if(contRisk > 25 || (daysToSubculture !== null && daysToSubculture <= 7) || health < 60){
-      predictions.push({c, health, contRisk, daysToSubculture, growthTrend});
-    }
-  });
-
-  if(!predictions.length){
-    el.innerHTML=`<div class="alert alert-success"><svg class="alert-icon" viewBox="0 0 18 18" fill="none" stroke="var(--accent)" stroke-width="1.7"><circle cx="9" cy="9" r="7"/><path d="M6 9l2 2 4-4" stroke-linecap="round"/></svg><div><div class="alert-title">ทุกอย่างปกติ</div><div class="alert-body">ไม่พบความเสี่ยงในขณะนี้ ระบบจะแจ้งเตือนเมื่อพบความเสี่ยง</div></div></div>`;
-    return;
-  }
-
-  predictions.sort((a,b)=>b.contRisk-a.contRisk);
-  el.innerHTML = predictions.map(p=>{
-    const riskColor = p.contRisk>60?'var(--danger)':p.contRisk>30?'var(--warn)':'var(--accent)';
-    const riskLabel = p.contRisk>60?'⚠️ ความเสี่ยงสูง':p.contRisk>30?'🔶 ความเสี่ยงปานกลาง':'✅ ต้องติดตาม';
-    const trendIcon = p.growthTrend==='up'?'📈':p.growthTrend==='down'?'📉':'➡️';
-    return `<div class="card" style="margin-bottom:8px;border-left:3px solid ${riskColor}">
-      <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;margin-bottom:8px">
-        <div>
-          <div style="font-size:13px;font-weight:600">${p.c.id} — ${p.c.plant}</div>
-          <div style="font-size:11px;color:var(--text3)">${p.c.formula} · Batch ${getBatchName(p.c)}</div>
-        </div>
-        <span style="font-size:10px;padding:3px 8px;border-radius:12px;background:${p.contRisk>60?'var(--danger-light)':p.contRisk>30?'var(--warn-light)':'var(--accent-light)'};color:${riskColor};white-space:nowrap">${riskLabel}</span>
-      </div>
-      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;font-size:10px">
-        <div style="background:var(--bg);padding:6px;border-radius:6px;text-align:center">
-          <div style="font-size:13px;font-weight:700;color:${riskColor}">${p.contRisk}%</div>
-          <div style="color:var(--text3)">ความเสี่ยง Contam</div>
-        </div>
-        <div style="background:var(--bg);padding:6px;border-radius:6px;text-align:center">
-          <div style="font-size:13px;font-weight:700;color:var(--text)">${p.daysToSubculture!==null?(p.daysToSubculture<=0?'ถึงเวลาแล้ว':p.daysToSubculture+' วัน'):'—'}</div>
-          <div style="color:var(--text3)">ควร Subculture</div>
-        </div>
-        <div style="background:var(--bg);padding:6px;border-radius:6px;text-align:center">
-          <div style="font-size:13px;font-weight:700">${trendIcon}</div>
-          <div style="color:var(--text3)">แนวโน้มการเจริญ</div>
-        </div>
-      </div>
-      <div style="margin-top:8px;font-size:11px;color:var(--text2)">
-        <b>คำแนะนำ:</b> ${p.contRisk>60?'ตรวจสอบขวดและพิจารณาแยกทันที':p.daysToSubculture!==null&&p.daysToSubculture<=3?'เตรียมอาหารและวางแผน Subculture ภายใน '+p.daysToSubculture+' วัน':p.growthTrend==='down'?'ตรวจสภาพแวดล้อม แสง อุณหภูมิ และสูตรอาหาร':'ติดตามต่อและอัพเดตข้อมูลสม่ำเสมอ'}
-      </div>
-    </div>`;
-  }).join('');
-}
-
-// ──────────────────────────────────────────────
-// FIRESTORE SECURITY RULES HELPER (ข้อ 10)
-// ──────────────────────────────────────────────
-function showFirestoreRulesGuide(){
-  const rules = `rules_version = '2';
-service cloud.firestore {
-  match /databases/{database}/documents {
-
-    // ฟังก์ชันตรวจสอบว่า user login แล้วหรือไม่
-    // (ใช้ custom token แทน Firebase Auth เพราะระบบนี้ใช้ pass เอง)
-    // วิธีนี้: ปิด public write, เปิดอ่านได้เฉพาะ authenticated session
-    // สำหรับระบบนี้ที่ใช้ custom auth ให้ set rules แบบนี้:
-
-    // อนุญาตเฉพาะ IP หรือ domain ของคุณ (แนะนำมากที่สุด)
-    match /{document=**} {
-      allow read, write: if request.time < timestamp.date(2026, 12, 31);
-    }
-
-    // === หรือใช้ Firebase Authentication แทน (แนะนำ) ===
-    // match /{document=**} {
-    //   allow read, write: if request.auth != null;
-    // }
-  }
-}`;
-
-  const overlay = document.createElement('div');
-  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:700;display:flex;align-items:flex-end;justify-content:center';
-  overlay.innerHTML = `<div style="background:var(--card);border-radius:var(--radius) var(--radius) 0 0;width:100%;max-width:480px;max-height:90vh;overflow-y:auto;padding:0 0 env(safe-area-inset-bottom)">
-    <div style="width:36px;height:4px;background:var(--border2);border-radius:2px;margin:10px auto 0"></div>
-    <div style="padding:14px 16px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center">
-      <div style="font-size:15px;font-weight:600">🔐 Firestore Security Rules</div>
-      <button onclick="this.closest('div[style*=fixed]').remove()" style="font-size:18px;color:var(--text3);background:none;border:none;cursor:pointer">✕</button>
-    </div>
-    <div style="padding:16px">
-      <div class="alert alert-danger" style="margin-bottom:12px">
-        <div><div class="alert-title">⚠️ ข้อมูลของคุณยังไม่ปลอดภัย!</div>
-        <div class="alert-body">Firestore อยู่ในโหมด Test — ทุกคนบนโลกอ่าน/เขียนข้อมูลได้</div></div>
-      </div>
-      <div style="font-size:13px;font-weight:600;margin-bottom:8px">วิธีตั้งค่าความปลอดภัย:</div>
-      <div style="background:var(--bg2);border-radius:8px;padding:12px;font-size:12px;line-height:1.8;margin-bottom:12px">
-        <b>ขั้นตอน:</b><br>
-        1. เปิด <b>console.firebase.google.com</b><br>
-        2. เลือกโปรเจกต์ <b>tissue-me-chua</b><br>
-        3. กด <b>Firestore Database</b> → <b>Rules</b><br>
-        4. ลบโค้ดเก่าออก แล้วใส่โค้ดด้านล่าง<br>
-        5. กด <b>Publish</b>
-      </div>
-      <div style="font-size:12px;font-weight:600;margin-bottom:6px">Rules ที่แนะนำ (ล็อคถึง 31 ธ.ค. 2026):</div>
-      <pre style="background:#1a1a1a;color:#86efac;padding:12px;border-radius:8px;font-size:10px;overflow-x:auto;white-space:pre-wrap">${rules}</pre>
-      <div style="background:var(--warn-light);border-radius:8px;padding:10px;font-size:11px;color:var(--warn-text);margin-top:12px">
-        <b>💡 แนะนำระยะยาว:</b> เปิดใช้ Firebase Authentication เพื่อความปลอดภัยสูงสุด ข้อมูลจะถูกล็อคเฉพาะผู้ที่ login ผ่าน Firebase เท่านั้น
-      </div>
-      <button class="btn btn-primary" style="margin-top:12px" onclick="navigator.clipboard&&navigator.clipboard.writeText(${JSON.stringify(rules)}).then(()=>showToast('Copy แล้ว!'))">📋 Copy Rules</button>
-    </div>
-  </div>`;
-  document.body.appendChild(overlay);
-  overlay.addEventListener('click', e=>{if(e.target===overlay)overlay.remove();});
 }
 
 // ──────────────────────────────────────────────
@@ -2802,12 +2703,14 @@ function exportJSON(){
 
 function exportCSV(){
   const cultures = DB.cultures();
-  const headers = ['ID','ชนิดพืช','Explant','สูตรอาหาร','วันเริ่ม','Due Date','ผู้ทำ','Subculture ครั้งที่','มาจากขวด','สถานะ','วันปิด','อัพเดตล่าสุด','จำนวนยอด','จำนวนราก','ความยาวต้น(cm)','ความยาวราก(cm)','แท็ก','บันทึก'];
+  const headers = ['ID','Batch','Cycle','ชนิดพืช','Explant','สูตรอาหาร','วันเริ่ม','Due Date','ผู้ทำ','Subculture ครั้งที่','มาจากขวด','สถานะ','วันปิด','อัพเดตล่าสุด','จำนวนยอด','จำนวนราก','ความยาวต้น(cm)','ความยาวราก(cm)','แท็ก','บันทึก'];
   const rows = cultures.map(c=>{
     const last = c.updates&&c.updates.length ? c.updates[c.updates.length-1] : null;
     const statusTh = {'growing_well':'โตดี','growing_normal':'โตปกติ','growing_slow':'โตช้า','contaminated':'Contaminated','subcultured':'Subcultured'}[c.status]||c.status;
     return [
       c.id,
+      `"${getBatchName(c)}"`,
+      c.cycle??c.subnum??0,
       `"${c.plant||''}"`,
       `"${c.explant||''}"`,
       `"${c.formula||''}"`,
@@ -2861,25 +2764,16 @@ function showToast(msg){const t=document.getElementById('toast');t.textContent=m
 
 // Init
 window.onFbReady=function(){
-  // Enable login button (may be called before or after DOMContentLoaded)
-  function enableLoginBtn(){
-    const btn=document.getElementById('loginBtn');
-    const status=document.getElementById('loginStatus');
-    if(btn){btn.disabled=false;btn.style.opacity='1';}
-    if(status)status.style.display='none';
-  }
-  // If DOM ready, enable immediately; else wait
-  if(document.readyState==='loading'){
-    document.addEventListener('DOMContentLoaded', enableLoginBtn);
-  } else {
-    enableLoginBtn();
-  }
+  const btn=document.getElementById('loginBtn');
+  const status=document.getElementById('loginStatus');
+  if(btn){btn.disabled=false;btn.style.opacity='1';}
+  if(status)status.style.display='none';
 
   const{db,collection,getDocs,doc,setDoc}=FS;
   getDocs(collection(db,'users')).then(snap=>{
     DB._users=snap.docs.map(d=>d.data());
     if(!DB._users.find(u=>u.superadmin)){
-      const sa={id:'SUPERADMIN',name:'สาธิต ฉัตรพันธุ์',email:'Satit.c@psru.ac.th',pass:'254102',role:'admin',approved:true,avatar:'ส',superadmin:true};
+      const sa={id:'SUPERADMIN',name:'สาธิต ฉัตรพันธุ์',email:'Satit.c@psru.ac.th',pass:'254102',role:'admin',approved:true,avatar:'ส',superadmin:true,permissions:{}};
       setDoc(doc(db,'users','SUPERADMIN'),sa).then(()=>{DB._users.push(sa);});
     }
     // Auto-login from saved session
@@ -2890,20 +2784,12 @@ window.onFbReady=function(){
           const user=DB._users.find(u=>u.id===sess.id&&(u.email||'').toLowerCase()===sess.email.toLowerCase());
           if(user&&user.approved){
             currentUser=user;
-            // Wait for DOM if needed
-            function startApp(){
-              document.getElementById('login-page').classList.add('hidden');
-              document.getElementById('app').classList.remove('hidden');
-              document.getElementById('userAvatar').textContent=user.avatar||user.name[0];
-              document.getElementById('mainFab').classList.remove('hidden');
-              initApp();
-              setupRealtimeSync();
-            }
-            if(document.readyState==='loading'){
-              document.addEventListener('DOMContentLoaded', startApp);
-            } else {
-              startApp();
-            }
+            document.getElementById('login-page').classList.add('hidden');
+            document.getElementById('app').classList.remove('hidden');
+            document.getElementById('userAvatar').textContent=user.avatar||user.name[0];
+            document.getElementById('mainFab').classList.remove('hidden');
+            initApp();
+            setupRealtimeSync();
             return;
           }
         } else {
@@ -2915,60 +2801,42 @@ window.onFbReady=function(){
 };
 
 window.addEventListener('DOMContentLoaded',()=>{
+  // Disable button while waiting for Firebase
   const btn=document.getElementById('loginBtn');
   const status=document.getElementById('loginStatus');
-  // Only disable if Firebase truly not ready yet
   if(!window._fbReady){
     if(btn){btn.disabled=true;btn.style.opacity='0.6';}
     if(status){status.style.display='block';document.getElementById('loginStatusText').textContent='⏳ กำลังเชื่อมต่อ...';}
-    // Safety: auto-enable after 15 sec regardless
-    setTimeout(()=>{
-      if(btn&&btn.disabled){
-        btn.disabled=false;btn.style.opacity='1';
-        if(status)status.style.display='none';
-      }
-    },15000);
   } else {
-    // Firebase already ready — make sure button is enabled
-    if(btn){btn.disabled=false;btn.style.opacity='1';}
-    if(status)status.style.display='none';
+    // Firebase already ready (unlikely but handle it)
+    window.onFbReady();
   }
 });
 
 // Realtime sync — listens to Firestore changes and updates UI live
-let _unsubCultures=null,_unsubTemps=null,_unsubUsers=null,_unsubFormulas=null,_unsubPlants=null,_unsubNotes=null,_unsubSchedule=null,_unsubInventory=null,_unsubProtocols=null;
+let _unsubCultures=null,_unsubTemps=null,_unsubUsers=null,_unsubFormulas=null,_unsubPlants=null,_unsubNotes=null,_unsubSchedule=null,_unsubInventory=null,_unsubProtocols=null,_unsubBatches=null;
 function setupRealtimeSync(){
   const{db,collection,onSnapshot}=FS;
-  [_unsubCultures,_unsubTemps,_unsubUsers,_unsubFormulas,_unsubPlants,_unsubNotes,_unsubSchedule,_unsubInventory,_unsubProtocols].forEach(u=>{try{if(u)u();}catch(e){}});
-
+  [_unsubCultures,_unsubTemps,_unsubUsers,_unsubFormulas,_unsubPlants,_unsubNotes,_unsubSchedule,_unsubInventory,_unsubProtocols,_unsubBatches].forEach(u=>{try{if(u)u();}catch(e){}});
   _unsubCultures=onSnapshot(collection(db,'cultures'),snap=>{DB._cultures=snap.docs.map(d=>d.data());refreshCurrentPage();});
   _unsubTemps=onSnapshot(collection(db,'temps'),snap=>{DB._temps=snap.docs.map(d=>d.data()).sort((a,b)=>a.datetime.localeCompare(b.datetime));if(currentPage==='lab'||currentPage==='dashboard')refreshCurrentPage();});
   _unsubUsers=onSnapshot(collection(db,'users'),snap=>{
     DB._users=snap.docs.map(d=>d.data());
-    // อัพเดต permissions ของ currentUser แบบ realtime
-    if(currentUser){const fresh=DB._users.find(u=>u.id===currentUser.id);if(fresh)currentUser=fresh;}
+    if(currentUser){
+      const fresh=DB._users.find(u=>u.id===currentUser.id);
+      if(fresh)currentUser=fresh;
+    }
     applyPermissionUI();
     if(currentPage==='settings')renderSettings();
     else refreshCurrentPage();
   });
-  // ✅ Formulas, Plants, Notes — sync ผ่าน Firestore realtime
-  _unsubFormulas=onSnapshot(collection(db,'formulas'),snap=>{
-    DB._formulas=snap.docs.map(d=>d.data());
-    populateFormulaSelect();
-    if(currentPage==='settings')renderFormulaList();
-  });
-  _unsubPlants=onSnapshot(collection(db,'plants'),snap=>{
-    DB._plants=snap.docs.map(d=>d.data());
-    populateFormulaSelect();
-    if(currentPage==='settings')renderPlantList();
-  });
-  _unsubNotes=onSnapshot(collection(db,'notes'),snap=>{
-    DB._notes=snap.docs.map(d=>d.data());
-    if(currentPage==='settings')renderNotesList();
-  });
+  _unsubFormulas=onSnapshot(collection(db,'formulas'),snap=>{DB._formulas=snap.docs.map(d=>d.data());populateFormulaSelect();if(currentPage==='settings')renderFormulaList();});
+  _unsubPlants=onSnapshot(collection(db,'plants'),snap=>{DB._plants=snap.docs.map(d=>d.data());populateFormulaSelect();if(currentPage==='settings')renderPlantList();});
+  _unsubNotes=onSnapshot(collection(db,'notes'),snap=>{DB._notes=snap.docs.map(d=>d.data());if(currentPage==='settings')renderNotesList();});
   _unsubSchedule=onSnapshot(collection(db,'schedule'),snap=>{DB._schedule=snap.docs.map(d=>d.data());if(currentPage==='lab')renderSchedule();});
   _unsubInventory=onSnapshot(collection(db,'inventory'),snap=>{DB._inventory=snap.docs.map(d=>d.data());if(currentPage==='lab')renderInventory();});
   _unsubProtocols=onSnapshot(collection(db,'protocols'),snap=>{DB._protocols=snap.docs.map(d=>d.data());if(currentPage==='lab')renderProtocols();});
+  _unsubBatches=onSnapshot(collection(db,'batches'),snap=>{DB._batches=snap.docs.map(d=>d.data());if(currentPage==='dashboard')refreshCurrentPage();});
 }
 
 function refreshCurrentPage(){
@@ -2981,6 +2849,255 @@ function refreshCurrentPage(){
     else if(currentPage==='detail'&&currentDetailId)showDetail(currentDetailId);
   }catch(e){console.warn('refresh failed',e);}
 }
+
+/* ──────────────────────────────────────────────
+   ADVANCED FEATURES PATCH — KEEP ORIGINAL UI
+   เพิ่มฟีเจอร์โดยใช้หน้าตาเดิม: Experiment, Growth, Media Version,
+   Audit Log, Smart Risk, Contamination Analysis, KPI Dashboard
+────────────────────────────────────────────── */
+(function(){
+  const ADV_COL={experiments:'experiments',growth:'growthRecords',media:'mediaVersions',audit:'auditLogs',contam:'contaminationReports'};
+  DB._experiments=DB._experiments||[];
+  DB._growthRecords=DB._growthRecords||[];
+  DB._mediaVersions=DB._mediaVersions||[];
+  DB._auditLogs=DB._auditLogs||[];
+  DB._contaminationReports=DB._contaminationReports||[];
+  DB.experiments=function(){return (this._experiments||[]).filter(x=>canSeeAdvancedItem(x));};
+  DB.growthRecords=function(){return (this._growthRecords||[]).filter(x=>canSeeAdvancedItem(x));};
+  DB.mediaVersions=function(){return (this._mediaVersions||[]).filter(x=>canSeeAdvancedItem(x));};
+  DB.auditLogs=function(){return (this._auditLogs||[]).filter(x=>canSeeAdvancedItem(x));};
+  DB.contaminationReports=function(){return (this._contaminationReports||[]).filter(x=>canSeeAdvancedItem(x));};
+  DB.saveAdvanced=async function(col,obj,doAudit=true){
+    const {db,doc,setDoc}=FS;
+    obj.updatedAt=obj.updatedAt||new Date().toISOString();
+    await setDoc(doc(db,col,obj.id),obj);
+    if(doAudit && col!==ADV_COL.audit){await addAudit('SAVE_'+col,(obj.name||obj.cultureId||obj.id||''));}
+  };
+  DB.deleteAdvanced=async function(col,id){const{db,doc,deleteDoc}=FS;await deleteDoc(doc(db,col,id));await addAudit('DELETE_'+col,id);};
+
+  window.canSeeAdvancedItem=function(item){
+    if(!currentUser)return false;
+    if(currentUser.superadmin||currentUser.role==='admin'||can('viewAllCultures'))return true;
+    return !item.ownerId || item.ownerId===currentUser.id || item.userId===currentUser.id || item.createdBy===currentUser.id;
+  };
+  window.addAudit=async function(action,detail){
+    if(!window.FS||!currentUser)return;
+    const obj={id:'log_'+Date.now()+'_'+Math.random().toString(36).slice(2,6),action,detail:detail||'',date:new Date().toISOString(),userId:currentUser.id,userName:currentUser.name||currentUser.email||'',ownerId:currentUser.id};
+    const {db,doc,setDoc}=FS;
+    await setDoc(doc(db,ADV_COL.audit,obj.id),obj);
+  };
+
+  function injectAdvancedUI(){
+    if(document.getElementById('advancedOriginalUiStyle'))return;
+    document.head.insertAdjacentHTML('beforeend',`<style id="advancedOriginalUiStyle">
+      .adv-row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}.adv-actions{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px}.adv-mini{font-size:11px;color:var(--text3);margin-top:2px}.adv-risk{border-left:3px solid var(--warn);background:var(--warn-light);padding:9px 10px;border-radius:var(--radius-sm);font-size:12px;margin-bottom:8px}.adv-risk.danger{border-left-color:var(--danger);background:var(--danger-light)}.adv-health{height:5px;background:var(--bg3);border-radius:99px;overflow:hidden;margin-top:8px}.adv-health>i{display:block;height:100%;background:var(--accent);border-radius:99px}.adv-health.warn>i{background:var(--warn)}.adv-health.danger>i{background:var(--danger)}
+    </style>`);
+
+    const labTabs=document.getElementById('labTabs');
+    if(labTabs && !document.getElementById('advLabTabBtn')){
+      labTabs.insertAdjacentHTML('beforeend',`<button id="advLabTabBtn" class="tab-btn" onclick="switchLabTab('advanced',this)" style="flex:1;font-size:11px;padding:7px 4px">🧠 Advanced</button>`);
+      const sec=labTabs.parentElement;
+      sec.insertAdjacentHTML('beforeend',`<div id="labTab-advanced" class="hidden">
+        <div class="section-label" style="margin-bottom:12px">Advanced Lab System</div>
+        <div class="adv-actions">
+          <button class="btn btn-outline btn-sm" onclick="openExperimentModal()">+ Experiment</button>
+          <button class="btn btn-outline btn-sm" onclick="openMediaVersionModal()">+ Media Version</button>
+          <button class="btn btn-outline btn-sm" onclick="openGrowthRecordModal()">+ Growth</button>
+          <button class="btn btn-outline btn-sm" onclick="openContaminationModal()">+ Contamination</button>
+        </div>
+        <div class="card" style="margin-bottom:12px"><div class="section-label" style="margin-bottom:8px">Experiment Mode</div><div id="advancedExperimentList"></div></div>
+        <div class="card" style="margin-bottom:12px"><div class="section-label" style="margin-bottom:8px">Media Versioning</div><div id="advancedMediaList"></div></div>
+        <div class="card" style="margin-bottom:12px"><div class="section-label" style="margin-bottom:8px">Growth Analytics Records</div><div id="advancedGrowthList"></div></div>
+        <div class="card" style="margin-bottom:12px"><div class="section-label" style="margin-bottom:8px">Contamination Analysis</div><div id="advancedContamList"></div></div>
+        <div class="card"><div class="section-label" style="margin-bottom:8px">Audit Log</div><div id="advancedAuditList"></div></div>
+      </div>`);
+    }
+
+    const dashboard=document.querySelector('#page-dashboard .section');
+    if(dashboard && !document.getElementById('advancedDashboardBlock')){
+      dashboard.insertAdjacentHTML('beforeend',`<div id="advancedDashboardBlock">
+        <div class="section-label">Advanced KPI / ตัวชี้วัดขั้นสูง</div>
+        <div class="stats-grid" id="advancedKpiGrid"></div>
+        <div class="section-label">Smart Risk Detection / วิเคราะห์ความเสี่ยง</div>
+        <div id="advancedRiskPanel"></div>
+      </div>`);
+    }
+
+    const analytics=document.querySelector('#page-analytics .section');
+    if(analytics && !document.getElementById('advancedAnalyticsBlock')){
+      analytics.insertAdjacentHTML('beforeend',`<div id="advancedAnalyticsBlock">
+        <div class="section-label">Growth Analytics</div>
+        <div class="card"><div class="chart-container"><canvas id="advancedGrowthChart"></canvas></div></div>
+        <div class="section-label">Media Success / Risk</div>
+        <div class="card"><div class="chart-container"><canvas id="advancedMediaChart"></canvas></div></div>
+        <div class="section-label">Contamination Analysis</div>
+        <div class="card"><div class="chart-container"><canvas id="advancedContamChart"></canvas></div></div>
+      </div>`);
+    }
+
+    const formulaRow=document.getElementById('f_formula')?.closest('.form-row');
+    if(formulaRow && !document.getElementById('advancedCultureFields')){
+      formulaRow.insertAdjacentHTML('afterend',`<div class="form-row" id="advancedCultureFields">
+        <div class="form-group"><label class="form-label">Experiment</label><select class="inp" id="f_experiment"><option value="">ไม่ระบุ</option></select></div>
+        <div class="form-group"><label class="form-label">กลุ่มทดลอง</label><input class="inp" id="f_expgroup" placeholder="Control / A / B"/></div>
+        <div class="form-group" style="grid-column:1/3"><label class="form-label">Media Version</label><select class="inp" id="f_mediaVersion"><option value="">ใช้สูตรอาหารปกติ</option></select></div>
+      </div>`);
+    }
+
+    if(!document.getElementById('advancedModal')){
+      document.body.insertAdjacentHTML('beforeend',`<div class="modal-overlay hidden" id="advancedModal"><div class="modal-sheet"><div class="modal-handle"></div><div class="modal-header"><div class="modal-title" id="advancedModalTitle"></div><button onclick="closeAdvancedModal()" style="font-size:22px;color:var(--text3)">×</button></div><div class="modal-body" id="advancedModalBody"></div><div class="modal-footer" id="advancedModalFooter"></div></div></div>`);
+    }
+  }
+
+  const oldSwitchLabTab=window.switchLabTab;
+  window.switchLabTab=function(tab,el){
+    const tabs=['schedule','inventory','protocol','temp','alerts','advanced'];
+    tabs.forEach(t=>{const x=document.getElementById('labTab-'+t); if(x)x.classList.toggle('hidden',t!==tab);});
+    document.querySelectorAll('#labTabs .tab-btn').forEach(b=>b.classList.remove('active'));
+    if(el)el.classList.add('active');
+    if(tab==='advanced')renderAdvancedLab(); else if(oldSwitchLabTab && !tabs.includes(tab))oldSwitchLabTab(tab,el);
+  };
+
+  const oldSetup=window.setupRealtimeSync;
+  window.setupRealtimeSync=function(){
+    oldSetup&&oldSetup();
+    const {db,collection,onSnapshot}=FS;
+    window._unsubAdvanced=window._unsubAdvanced||[];
+    window._unsubAdvanced.forEach(u=>{try{u()}catch(e){}}); window._unsubAdvanced=[];
+    window._unsubAdvanced.push(onSnapshot(collection(db,ADV_COL.experiments),snap=>{DB._experiments=snap.docs.map(d=>d.data());refreshCurrentPage();}));
+    window._unsubAdvanced.push(onSnapshot(collection(db,ADV_COL.growth),snap=>{DB._growthRecords=snap.docs.map(d=>d.data());refreshCurrentPage();}));
+    window._unsubAdvanced.push(onSnapshot(collection(db,ADV_COL.media),snap=>{DB._mediaVersions=snap.docs.map(d=>d.data());populateAdvancedSelects();refreshCurrentPage();}));
+    window._unsubAdvanced.push(onSnapshot(collection(db,ADV_COL.audit),snap=>{DB._auditLogs=snap.docs.map(d=>d.data());refreshCurrentPage();}));
+    window._unsubAdvanced.push(onSnapshot(collection(db,ADV_COL.contam),snap=>{DB._contaminationReports=snap.docs.map(d=>d.data());refreshCurrentPage();}));
+  };
+
+  const oldRefresh=window.refreshCurrentPage;
+  window.refreshCurrentPage=function(){oldRefresh&&oldRefresh(); renderAdvancedDashboard(); if(currentPage==='analytics')renderAdvancedAnalytics(); if(currentPage==='lab' && !document.getElementById('labTab-advanced')?.classList.contains('hidden'))renderAdvancedLab();};
+
+  const oldShowPage=window.showPage;
+  window.showPage=function(name){oldShowPage(name); setTimeout(()=>{injectAdvancedUI();populateAdvancedSelects();renderAdvancedDashboard(); if(name==='analytics')renderAdvancedAnalytics(); if(name==='lab')renderAdvancedLab();},0);};
+
+  const oldPopulateFormulaSelect=window.populateFormulaSelect;
+  window.populateFormulaSelect=function(){oldPopulateFormulaSelect&&oldPopulateFormulaSelect(); populateAdvancedSelects();};
+
+  function esc2(s){return String(s??'').replace(/[&<>'"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]));}
+  function advDate(s){return (typeof formatDate==='function')?formatDate(s):(s||'—');}
+  function ageDays(c){if(!c?.startDate)return 0;return Math.max(0,Math.floor(((c.closedDate?new Date(c.closedDate):new Date())-new Date(c.startDate))/86400000));}
+  function healthScore(c){let s=100,d=ageDays(c); if(c.status==='contaminated'||c.status==='Contamination')return 0; if(d>35)s-=30; else if(d>25)s-=18; else if(d>18)s-=8; if(c.status==='growing_slow')s-=15; if(c.dueDate && new Date(c.dueDate)<new Date())s-=15; return Math.max(0,Math.min(100,s));}
+  function riskList(cultures=DB.cultures()){
+    const risks=[]; const cont=cultures.filter(c=>c.status==='contaminated'||c.status==='Contamination').length; const total=cultures.length||1; const rate=cont/total*100;
+    if(rate>=20)risks.push({level:'danger',title:'Contamination สูง',body:`อัตราปนเปื้อน ${rate.toFixed(1)}% ควรตรวจแหล่งปนเปื้อนและ protocol`});
+    cultures.forEach(c=>{const d=ageDays(c); if(c.status!=='closed' && d>35)risks.push({level:'danger',title:`${c.id} เกินรอบ subculture`,body:`เลี้ยงมา ${d} วันแล้ว ควรตรวจและพิจารณาย้ายอาหาร`}); else if(c.status!=='closed' && d>25)risks.push({level:'warn',title:`${c.id} ใกล้เกินรอบ`,body:`เลี้ยงมา ${d} วัน เตรียม subculture`});});
+    const byMedia={}; cultures.forEach(c=>{const k=c.mediaVersion||c.formula||'ไม่ระบุ'; byMedia[k]=byMedia[k]||{t:0,c:0}; byMedia[k].t++; if(c.status==='contaminated'||c.status==='Contamination')byMedia[k].c++;});
+    Object.entries(byMedia).forEach(([k,v])=>{if(v.t>=3 && v.c/v.t>=0.34)risks.push({level:'warn',title:`สูตร/เวอร์ชัน ${k} เสี่ยง`,body:`พบ contamination ${v.c}/${v.t} รายการ`});});
+    return risks.slice(0,8);
+  }
+  function healthBar(score){const cls=score<45?'danger':score<70?'warn':'';return `<div class="adv-health ${cls}"><i style="width:${score}%"></i></div>`;}
+
+  function populateAdvancedSelects(){
+    const exp=document.getElementById('f_experiment'); if(exp){const v=exp.value; exp.innerHTML='<option value="">ไม่ระบุ</option>'+DB.experiments().map(e=>`<option value="${esc2(e.id)}">${esc2(e.name)}</option>`).join(''); exp.value=v;}
+    const mv=document.getElementById('f_mediaVersion'); if(mv){const v=mv.value; mv.innerHTML='<option value="">ใช้สูตรอาหารปกติ</option>'+DB.mediaVersions().map(m=>`<option value="${esc2(m.name)}">${esc2(m.name)}</option>`).join(''); mv.value=v;}
+  }
+
+  window.renderAdvancedDashboard=function(){
+    injectAdvancedUI();
+    const grid=document.getElementById('advancedKpiGrid'); if(!grid)return;
+    const cs=DB.cultures(); const total=cs.length; const contam=cs.filter(c=>c.status==='contaminated'||c.status==='Contamination').length; const active=cs.filter(c=>!['closed','contaminated','Contamination'].includes(c.status)).length; const success=total?Math.round((total-contam)/total*100):0; const avg=total?Math.round(cs.reduce((a,c)=>a+healthScore(c),0)/total):0;
+    grid.innerHTML=`<div class="stat-card"><div class="stat-num stat-accent">${success}%</div><div class="stat-label">Success Rate</div></div><div class="stat-card"><div class="stat-num ${contam?'stat-danger':'stat-accent'}">${total?Math.round(contam/total*100):0}%</div><div class="stat-label">Contamination Rate</div></div><div class="stat-card"><div class="stat-num">${active}</div><div class="stat-label">Active Cultures</div></div><div class="stat-card"><div class="stat-num ${avg<60?'stat-warn':'stat-accent'}">${avg}%</div><div class="stat-label">Avg Health</div></div>`;
+    const panel=document.getElementById('advancedRiskPanel'); if(panel){const risks=riskList(cs); panel.innerHTML=risks.length?risks.map(r=>`<div class="adv-risk ${r.level==='danger'?'danger':''}"><b>${esc2(r.title)}</b><div class="adv-mini">${esc2(r.body)}</div></div>`).join(''):'<div class="alert alert-success"><div><div class="alert-title">ไม่พบความเสี่ยงสำคัญ</div><div class="alert-body">ระบบยังไม่พบ pattern ที่ผิดปกติจากข้อมูลปัจจุบัน</div></div></div>';}
+  };
+
+  window.renderAdvancedLab=function(){
+    injectAdvancedUI(); populateAdvancedSelects();
+    const ex=document.getElementById('advancedExperimentList'); if(ex)ex.innerHTML=DB.experiments().length?DB.experiments().map(e=>`<div style="padding:9px 0;border-bottom:1px solid var(--border)"><b>${esc2(e.name)}</b><div class="adv-mini">${esc2(e.objective||'')} · Groups: ${esc2((e.groups||[]).join(', '))}</div><button class="btn btn-outline btn-sm" style="margin-top:6px" onclick="openExperimentModal('${e.id}')">แก้ไข</button></div>`).join(''):'<div class="empty">ยังไม่มี Experiment</div>';
+    const md=document.getElementById('advancedMediaList'); if(md)md.innerHTML=DB.mediaVersions().length?DB.mediaVersions().map(m=>`<div style="padding:9px 0;border-bottom:1px solid var(--border)"><b>${esc2(m.name)}</b> <span class="badge b-sub">${esc2(m.baseFormula||'')}</span><div class="adv-mini">${esc2(m.detail||'')}</div><button class="btn btn-outline btn-sm" style="margin-top:6px" onclick="openMediaVersionModal('${m.id}')">แก้ไข</button></div>`).join(''):'<div class="empty">ยังไม่มี Media Version</div>';
+    const gr=document.getElementById('advancedGrowthList'); if(gr){const rows=DB.growthRecords().sort((a,b)=>new Date(b.date||b.createdAt)-new Date(a.date||a.createdAt)).slice(0,20); gr.innerHTML=rows.length?rows.map(g=>`<div style="padding:9px 0;border-bottom:1px solid var(--border)"><b>${esc2(g.cultureId)}</b><div class="adv-mini">Day ${g.day||0} · shoots ${g.shoots||0} · height ${g.height||0} cm · ${advDate(g.date)}</div><div class="adv-mini">${esc2(g.note||'')}</div></div>`).join(''):'<div class="empty">ยังไม่มี Growth Record</div>';}
+    const ct=document.getElementById('advancedContamList'); if(ct){const rows=DB.contaminationReports().sort((a,b)=>new Date(b.date||b.createdAt)-new Date(a.date||a.createdAt)); ct.innerHTML=rows.length?rows.map(r=>`<div style="padding:9px 0;border-bottom:1px solid var(--border)"><b>${esc2(r.cultureId)}</b> <span class="badge b-cont">${esc2(r.type)}</span><div class="adv-mini">Source: ${esc2(r.source)} · ${advDate(r.date)}</div><div class="adv-mini">${esc2(r.note||'')}</div></div>`).join(''):'<div class="empty">ยังไม่มี Contamination Analysis</div>';}
+    const al=document.getElementById('advancedAuditList'); if(al){const rows=DB.auditLogs().sort((a,b)=>new Date(b.date)-new Date(a.date)).slice(0,30); al.innerHTML=rows.length?rows.map(a=>`<div class="tl-item" style="padding-bottom:10px"><div class="tl-dot"></div><div class="tl-date">${advDate(a.date)}</div><div class="tl-text">${esc2(a.action)}</div><div class="tl-sub">${esc2(a.userName||'')} · ${esc2(a.detail||'')}</div></div>`).join(''):'<div class="empty">ยังไม่มี Audit Log</div>';}
+  };
+
+  let advCharts=[];
+  function destroyAdvCharts(){advCharts.forEach(c=>{try{c.destroy()}catch(e){}}); advCharts=[];}
+  window.renderAdvancedAnalytics=function(){
+    injectAdvancedUI(); if(!window.Chart)return; destroyAdvCharts();
+    const gctx=document.getElementById('advancedGrowthChart'); if(gctx){const by={}; DB.growthRecords().forEach(g=>{if(!by[g.cultureId])by[g.cultureId]=[]; by[g.cultureId].push(g);}); const datasets=Object.keys(by).slice(0,6).map(k=>({label:k,data:by[k].sort((a,b)=>(a.day||0)-(b.day||0)).map(g=>({x:Number(g.day||0),y:Number(g.shoots||0)})),tension:.3})); advCharts.push(new Chart(gctx,{type:'line',data:{datasets},options:{responsive:true,maintainAspectRatio:false,parsing:false,scales:{x:{type:'linear',title:{display:true,text:'Day'}},y:{beginAtZero:true,title:{display:true,text:'Shoots'}}}}}));}
+    const mctx=document.getElementById('advancedMediaChart'); if(mctx){const map={}; DB.cultures().forEach(c=>{const k=c.mediaVersion||c.formula||'ไม่ระบุ'; map[k]=map[k]||{t:0,c:0}; map[k].t++; if(c.status==='contaminated'||c.status==='Contamination')map[k].c++;}); const rows=Object.entries(map).map(([name,v])=>({name,success:Math.round((v.t-v.c)/v.t*100),contam:Math.round(v.c/v.t*100)})); advCharts.push(new Chart(mctx,{type:'bar',data:{labels:rows.map(r=>r.name),datasets:[{label:'Success %',data:rows.map(r=>r.success)},{label:'Contamination %',data:rows.map(r=>r.contam)}]},options:{responsive:true,maintainAspectRatio:false,scales:{y:{beginAtZero:true,max:100}}}}));}
+    const cctx=document.getElementById('advancedContamChart'); if(cctx){const map={}; DB.contaminationReports().forEach(r=>{map[r.type||'Unknown']=(map[r.type||'Unknown']||0)+1;}); const labels=Object.keys(map); advCharts.push(new Chart(cctx,{type:'doughnut',data:{labels,datasets:[{data:labels.map(k=>map[k])}]},options:{responsive:true,maintainAspectRatio:false}}));}
+  };
+
+  window.closeAdvancedModal=function(){document.getElementById('advancedModal')?.classList.add('hidden');};
+  function advModal(title,body,footer){injectAdvancedUI(); advancedModalTitle.textContent=title; advancedModalBody.innerHTML=body; advancedModalFooter.innerHTML=footer; advancedModal.classList.remove('hidden'); setTimeout(populateAdvancedSelects,0);}
+  function cultureOptions(selected=''){return `<select id="adv_culture" class="inp"><option value="">เลือก Culture</option>${DB.cultures().map(c=>`<option value="${esc2(c.id)}" ${selected===c.id?'selected':''}>${esc2(c.id)} — ${esc2(c.plant)}</option>`).join('')}</select>`;}
+
+  window.openExperimentModal=function(id=''){const e=DB._experiments.find(x=>x.id===id)||{}; advModal(id?'แก้ไข Experiment':'เพิ่ม Experiment',`<div class="form-group"><label class="form-label">ชื่อ Experiment</label><input id="adv_exp_name" class="inp" value="${esc2(e.name||'')}"></div><div class="form-group"><label class="form-label">Objective</label><textarea id="adv_exp_obj" class="inp">${esc2(e.objective||'')}</textarea></div><div class="form-group"><label class="form-label">Groups คั่นด้วย comma</label><input id="adv_exp_groups" class="inp" value="${esc2((e.groups||['Control','A','B']).join(', '))}"></div>`,`<button class="btn btn-secondary" onclick="closeAdvancedModal()">ยกเลิก</button><button class="btn btn-primary" onclick="saveExperiment('${id}')">บันทึก</button>`);};
+  window.saveExperiment=async function(id=''){const old=DB._experiments.find(x=>x.id===id)||{}; const obj={id:id||'exp_'+Date.now(),name:adv_exp_name.value.trim(),objective:adv_exp_obj.value.trim(),groups:adv_exp_groups.value.split(',').map(x=>x.trim()).filter(Boolean),createdAt:old.createdAt||new Date().toISOString(),ownerId:old.ownerId||currentUser.id,ownerName:old.ownerName||currentUser.name}; if(!obj.name){showToast('กรอกชื่อ Experiment');return;} await DB.saveAdvanced(ADV_COL.experiments,obj); closeAdvancedModal(); renderAdvancedLab(); showToast('บันทึก Experiment แล้ว');};
+  window.openMediaVersionModal=function(id=''){const m=DB._mediaVersions.find(x=>x.id===id)||{}; advModal(id?'แก้ไข Media Version':'เพิ่ม Media Version',`<div class="form-row"><div class="form-group"><label class="form-label">ชื่อ Version</label><input id="adv_mv_name" class="inp" value="${esc2(m.name||'F1 v1')}"></div><div class="form-group"><label class="form-label">Base Formula</label><select id="adv_mv_base" class="inp"><option value="">เลือก</option>${DB.formulas().map(f=>`<option value="${esc2(f.name)}" ${m.baseFormula===f.name?'selected':''}>${esc2(f.name)}</option>`).join('')}</select></div></div><div class="form-group"><label class="form-label">รายละเอียด</label><textarea id="adv_mv_detail" class="inp">${esc2(m.detail||'')}</textarea></div>`,`<button class="btn btn-secondary" onclick="closeAdvancedModal()">ยกเลิก</button><button class="btn btn-primary" onclick="saveMediaVersion('${id}')">บันทึก</button>`);};
+  window.saveMediaVersion=async function(id=''){const old=DB._mediaVersions.find(x=>x.id===id)||{}; const obj={id:id||'mv_'+Date.now(),name:adv_mv_name.value.trim(),baseFormula:adv_mv_base.value,detail:adv_mv_detail.value.trim(),createdAt:old.createdAt||new Date().toISOString(),ownerId:old.ownerId||currentUser.id,ownerName:old.ownerName||currentUser.name}; if(!obj.name){showToast('กรอกชื่อ Media Version');return;} await DB.saveAdvanced(ADV_COL.media,obj); closeAdvancedModal(); populateAdvancedSelects(); renderAdvancedLab(); showToast('บันทึก Media Version แล้ว');};
+  window.openGrowthRecordModal=function(cid=''){advModal('บันทึก Growth Analytics',`<div class="form-group"><label class="form-label">Culture</label>${cultureOptions(cid)}</div><div class="form-row"><div class="form-group"><label class="form-label">Day</label><input id="adv_gr_day" class="inp" type="number" value="7"></div><div class="form-group"><label class="form-label">Shoots</label><input id="adv_gr_shoots" class="inp" type="number" value="1"></div></div><div class="form-row"><div class="form-group"><label class="form-label">Height cm</label><input id="adv_gr_height" class="inp" type="number" step="0.1"></div><div class="form-group"><label class="form-label">วันที่</label><input id="adv_gr_date" class="inp" type="date" value="${new Date().toISOString().slice(0,10)}"></div></div><div class="form-group"><label class="form-label">Note</label><input id="adv_gr_note" class="inp"></div>`,`<button class="btn btn-secondary" onclick="closeAdvancedModal()">ยกเลิก</button><button class="btn btn-primary" onclick="saveGrowthRecord()">บันทึก</button>`);};
+  window.saveGrowthRecord=async function(){const obj={id:'gr_'+Date.now(),cultureId:adv_culture.value,day:Number(adv_gr_day.value||0),shoots:Number(adv_gr_shoots.value||0),height:Number(adv_gr_height.value||0),date:adv_gr_date.value,note:adv_gr_note.value.trim(),ownerId:currentUser.id,ownerName:currentUser.name,createdAt:new Date().toISOString()}; if(!obj.cultureId){showToast('เลือก Culture');return;} await DB.saveAdvanced(ADV_COL.growth,obj); closeAdvancedModal(); renderAdvancedLab(); showToast('บันทึก Growth แล้ว');};
+  window.openContaminationModal=function(cid=''){advModal('Contamination Analysis',`<div class="form-group"><label class="form-label">Culture</label>${cultureOptions(cid)}</div><div class="form-row"><div class="form-group"><label class="form-label">Type</label><select id="adv_ct_type" class="inp"><option>Fungi</option><option>Bacteria</option><option>Yeast</option><option>Unknown</option></select></div><div class="form-group"><label class="form-label">Suspected Source</label><select id="adv_ct_source" class="inp"><option>Explant</option><option>Media</option><option>Air</option><option>Tool</option><option>Handling</option><option>Unknown</option></select></div></div><div class="form-group"><label class="form-label">วันที่พบ</label><input id="adv_ct_date" class="inp" type="date" value="${new Date().toISOString().slice(0,10)}"></div><div class="form-group"><label class="form-label">Note / ลักษณะที่เห็น</label><textarea id="adv_ct_note" class="inp"></textarea></div>`,`<button class="btn btn-secondary" onclick="closeAdvancedModal()">ยกเลิก</button><button class="btn btn-primary" onclick="saveContaminationReport()">บันทึก</button>`);};
+  window.saveContaminationReport=async function(){const obj={id:'ct_'+Date.now(),cultureId:adv_culture.value,type:adv_ct_type.value,source:adv_ct_source.value,date:adv_ct_date.value,note:adv_ct_note.value.trim(),ownerId:currentUser.id,ownerName:currentUser.name,createdAt:new Date().toISOString()}; if(!obj.cultureId){showToast('เลือก Culture');return;} await DB.saveAdvanced(ADV_COL.contam,obj); const c=DB.allCultures().find(x=>x.id===obj.cultureId); if(c){await DB.saveCulture({...c,status:'contaminated'}); await addAudit('MARK_CONTAMINATION',obj.cultureId);} closeAdvancedModal(); renderAdvancedLab(); showToast('บันทึก Contamination แล้ว');};
+
+  const oldResetAddForm=window.resetAddForm;
+  window.resetAddForm=function(){oldResetAddForm&&oldResetAddForm(); ['f_experiment','f_expgroup','f_mediaVersion'].forEach(id=>{const el=document.getElementById(id); if(el)el.value='';}); populateAdvancedSelects();};
+
+  const oldEditCulture=window.editCulture;
+  window.editCulture=function(id){oldEditCulture(id); setTimeout(()=>{const c=DB.allCultures().find(x=>x.id===id); if(!c)return; const ex=document.getElementById('f_experiment'); const eg=document.getElementById('f_expgroup'); const mv=document.getElementById('f_mediaVersion'); populateAdvancedSelects(); if(ex)ex.value=c.experimentId||''; if(eg)eg.value=c.expGroup||''; if(mv)mv.value=c.mediaVersion||'';},80);};
+
+  const oldSaveCulture=window.saveCulture;
+  window.saveCulture=async function(){
+    const beforeId=currentDetailId;
+    const ex=document.getElementById('f_experiment')?.value||''; const eg=document.getElementById('f_expgroup')?.value||''; const mv=document.getElementById('f_mediaVersion')?.value||'';
+    await oldSaveCulture();
+    setTimeout(async()=>{
+      try{
+        let target=beforeId?DB.allCultures().find(x=>x.id===beforeId):DB.allCultures().slice().sort((a,b)=>(b.id||'').localeCompare(a.id||''))[0];
+        if(target&&(ex||eg||mv)){await DB.saveCulture({...target,experimentId:ex,expGroup:eg,mediaVersion:mv}); await addAudit(beforeId?'UPDATE_CULTURE_ADVANCED':'ADD_CULTURE_ADVANCED',target.id);}
+      }catch(e){console.warn('advanced culture fields not saved',e)}
+    },200);
+  };
+
+  const oldShowDetail=window.showDetail;
+  window.showDetail=function(id){oldShowDetail(id); setTimeout(()=>{const c=DB.allCultures().find(x=>x.id===id); const box=document.querySelector('#detailContent .card'); if(!c||!box||document.getElementById('advancedDetailBlock'))return; const exp=DB._experiments.find(e=>e.id===c.experimentId); const gr=DB.growthRecords().filter(g=>g.cultureId===c.id).sort((a,b)=>(a.day||0)-(b.day||0)); const last=gr[gr.length-1]; const reports=DB.contaminationReports().filter(r=>r.cultureId===c.id); const score=healthScore(c); box.insertAdjacentHTML('beforeend',`<div id="advancedDetailBlock" style="margin-top:10px;padding-top:10px;border-top:1px solid var(--border)"><div style="font-size:10px;color:var(--text3);margin-bottom:6px">ADVANCED</div><div class="adv-row"><span class="badge b-sub">Health ${score}%</span>${c.mediaVersion?`<span class="badge b-sub">${esc2(c.mediaVersion)}</span>`:''}${exp?`<span class="badge b-norm">${esc2(exp.name)}${c.expGroup?' · '+esc2(c.expGroup):''}</span>`:''}</div>${healthBar(score)}${last?`<div class="adv-mini">Growth ล่าสุด: Day ${last.day||0}, ${last.shoots||0} ยอด, สูง ${last.height||0} cm</div>`:''}${reports.length?`<div class="adv-risk danger" style="margin-top:8px"><b>Contamination record</b><div class="adv-mini">${reports.length} รายการล่าสุด: ${esc2(reports[reports.length-1].type)} / ${esc2(reports[reports.length-1].source)}</div></div>`:''}<div class="adv-actions" style="margin-top:8px;margin-bottom:0"><button class="btn btn-outline btn-sm" onclick="openGrowthRecordModal('${c.id}')">+ Growth</button><button class="btn btn-outline btn-sm" onclick="openContaminationModal('${c.id}')">+ Contam</button></div></div>`);},120);};
+
+  injectAdvancedUI();
+})();
+
 </script>
+
+
+<script>
+/* AUTO ADVANCED MODE PATCH: Advanced = auto summary only. No duplicate data entry. */
+(function(){
+  function esc(s){return String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
+  function isContam(c){return ['contaminated','contamination','Contamination'].includes(c?.status);}
+  function isClosed(c){return ['closed','Closed'].includes(c?.status);}
+  function getCultures(){try{return typeof DB?.cultures==='function'?DB.cultures():[]}catch(e){return []}}
+  function days(c){try{if(!c?.startDate)return 0; const end=c.closedDate?new Date(c.closedDate):new Date(); return Math.max(0,Math.floor((end-new Date(c.startDate))/86400000));}catch(e){return 0}}
+  function pct(n){return Number.isFinite(n)?n.toFixed(1)+'%':'0.0%'}
+  function fmtDate(s){try{return typeof formatDate==='function'?formatDate(s):(s||'—')}catch(e){return s||'—'}}
+  function hScore(c){let s=100,d=days(c); if(isContam(c)) return 0; if(isClosed(c)) s-=8; if(d>40) s-=35; else if(d>30) s-=25; else if(d>21) s-=12; if(c.status==='growing_slow') s-=18; if(c.dueDate && new Date(c.dueDate)<new Date() && !isClosed(c)) s-=15; return Math.max(0,Math.min(100,Math.round(s)));}
+  function actionFor(c){const d=days(c); if(isContam(c)) return {level:'danger',text:'แยก/ปิดงาน และตรวจแหล่งปนเปื้อน'}; if(isClosed(c)) return {level:'normal',text:'ปิดงานแล้ว'}; if(c.dueDate && new Date(c.dueDate)<new Date()) return {level:'danger',text:'เกินกำหนด ควรตรวจและ Subculture'}; if(d>30) return {level:'danger',text:'ควร Subculture ตอนนี้'}; if(d>21) return {level:'warn',text:'เตรียม Subculture'}; return {level:'good',text:'ติดตามตามรอบปกติ'};}
+  function groupBy(arr,fn){return arr.reduce((m,x)=>{const k=fn(x)||'ไม่ระบุ';(m[k]||(m[k]=[])).push(x);return m;},{});}
+  function safeFormula(c){return c.mediaVersion||c.formula||'ไม่ระบุ'}
+  function kpi(cs){const total=cs.length, active=cs.filter(c=>!isClosed(c)&&!isContam(c)).length, contam=cs.filter(isContam).length, closed=cs.filter(isClosed).length; const avgHealth=total?Math.round(cs.reduce((s,c)=>s+hScore(c),0)/total):0; return {total,active,contam,closed,successRate:total?((total-contam)/total*100):0,contamRate:total?(contam/total*100):0,avgHealth};}
+  function riskList(cs){const risks=[]; const total=cs.length||1; const contam=cs.filter(isContam).length; const rate=contam/total*100; if(rate>=20)risks.push({level:'danger',title:'Contamination สูงผิดปกติ',body:`พบ ${contam}/${total} รายการ (${pct(rate)}) ควรตรวจขั้นตอนฟอกฆ่าเชื้อ/อากาศ/อาหาร`}); const overdue=cs.filter(c=>!isClosed(c)&&!isContam(c)&&(days(c)>30 || (c.dueDate&&new Date(c.dueDate)<new Date()))); if(overdue.length)risks.push({level:'danger',title:'มีรายการเกินรอบ Subculture',body:`${overdue.length} รายการต้องตรวจทันที เช่น ${overdue.slice(0,3).map(c=>c.id).join(', ')}`}); Object.entries(groupBy(cs,safeFormula)).forEach(([f,items])=>{const n=items.filter(isContam).length; const r=n/(items.length||1)*100; if(items.length>=3&&r>=34)risks.push({level:'warn',title:`สูตร ${f} มีความเสี่ยง`,body:`ปนเปื้อน ${n}/${items.length} รายการ (${pct(r)})`});}); return risks.slice(0,8);}
+  function statCard(num,label,cls=''){return `<div class="stat-card"><div class="stat-num ${cls}">${num}</div><div class="stat-label">${label}</div></div>`;}
+  function healthBar(score){const cls=score<45?'danger':score<70?'warn':'';return `<div class="adv-health ${cls}"><i style="width:${score}%"></i></div>`;}
+  function removeDuplicateButtons(){if(!document.getElementById('advancedAutoModeStyle')){document.head.insertAdjacentHTML('beforeend',`<style id="advancedAutoModeStyle">#labTab-advanced .adv-actions{display:none!important}#advancedDetailBlock .adv-actions{display:none!important}#advancedExperimentList button,#advancedMediaList button{display:none!important}.auto-insight-row{padding:10px 0;border-bottom:1px solid var(--border)}.auto-insight-row:last-child{border-bottom:none}.auto-mini{font-size:11px;color:var(--text3);margin-top:3px;line-height:1.45}</style>`);}}
+  window.renderAdvancedDashboard=function(){removeDuplicateButtons(); const cs=getCultures(),v=kpi(cs),grid=document.getElementById('advancedKpiGrid'); if(grid){grid.innerHTML=statCard(v.successRate.toFixed(0)+'%','Success Rate / อัตราสำเร็จ','stat-accent')+statCard(v.contamRate.toFixed(0)+'%','Contamination / ปนเปื้อน',v.contamRate>=20?'stat-danger':'stat-warn')+statCard(v.avgHealth+'%','Avg Health / สุขภาพเฉลี่ย','stat-accent')+statCard(v.active,'Active Culture / กำลังเลี้ยง','');} const panel=document.getElementById('advancedRiskPanel'); if(panel){const risks=riskList(cs); panel.innerHTML=risks.length?risks.map(r=>`<div class="adv-risk ${r.level==='danger'?'danger':''}"><b>${esc(r.title)}</b><div class="adv-mini">${esc(r.body)}</div></div>`).join(''):`<div class="alert alert-success"><div><div class="alert-title">ไม่พบความเสี่ยงสำคัญ</div><div class="alert-body">คำนวณอัตโนมัติจากสถานะ อายุ และสูตรอาหารของ Culture ปัจจุบัน</div></div></div>`;}};
+  window.renderAdvancedLab=function(){removeDuplicateButtons(); const cs=getCultures(),v=kpi(cs); const ex=document.getElementById('advancedExperimentList'); if(ex){const byExp=groupBy(cs,c=>c.experimentId||c.experiment||'ไม่ระบุ Experiment'); ex.innerHTML=Object.entries(byExp).map(([name,items])=>{const kk=kpi(items),groups=groupBy(items,c=>c.expGroup||c.group||'ไม่ระบุกลุ่ม'),gtext=Object.entries(groups).map(([g,a])=>`${esc(g)}: ${a.length}`).join(' · '); return `<div class="auto-insight-row"><b>${esc(name)}</b><div class="auto-mini">${items.length} cultures · Success ${kk.successRate.toFixed(0)}% · Contam ${kk.contamRate.toFixed(0)}%</div><div class="auto-mini">${gtext}</div></div>`;}).join('')||'<div class="empty"><div class="empty-text">ยังไม่มี Culture ที่ระบุ Experiment — ถ้าต้องการเปรียบเทียบ ให้เลือก Experiment ตอนบันทึก Culture ครั้งเดียวพอ</div></div>';}
+    const md=document.getElementById('advancedMediaList'); if(md){const byMedia=groupBy(cs,safeFormula); md.innerHTML=Object.entries(byMedia).map(([name,items])=>{const kk=kpi(items),avg=items.length?Math.round(items.reduce((s,c)=>s+days(c),0)/items.length):0; return `<div class="auto-insight-row"><b>${esc(name)}</b><div class="auto-mini">${items.length} cultures · Success ${kk.successRate.toFixed(0)}% · Contam ${kk.contamRate.toFixed(0)}% · อายุเฉลี่ย ${avg} วัน</div></div>`;}).join('')||'<div class="empty"><div class="empty-text">ยังไม่มีข้อมูลสูตรอาหารจาก Culture</div></div>';}
+    const gr=document.getElementById('advancedGrowthList'); if(gr){const rows=cs.slice().sort((a,b)=>hScore(a)-hScore(b)).slice(0,20); gr.innerHTML=rows.length?rows.map(c=>{const a=actionFor(c),s=hScore(c);return `<div class="auto-insight-row"><b>${esc(c.id)} — ${esc(c.plant||'')}</b> <span class="badge ${a.level==='danger'?'b-cont':a.level==='warn'?'b-slow':'b-good'}">${s}%</span>${healthBar(s)}<div class="auto-mini">อายุ ${days(c)} วัน · ${esc(safeFormula(c))} · ${esc(a.text)}</div></div>`}).join(''):'<div class="empty"><div class="empty-text">ยังไม่มี Culture ให้ระบบวิเคราะห์</div></div>';}
+    const ct=document.getElementById('advancedContamList'); if(ct){const contam=cs.filter(isContam),byFormula=groupBy(contam,safeFormula),byPlant=groupBy(contam,c=>c.plant||'ไม่ระบุพืช'),formulaTxt=Object.entries(byFormula).map(([k,a])=>`${esc(k)}: ${a.length}`).join(' · ')||'ยังไม่พบ',plantTxt=Object.entries(byPlant).map(([k,a])=>`${esc(k)}: ${a.length}`).join(' · ')||'ยังไม่พบ'; ct.innerHTML=`<div class="auto-insight-row"><b>สรุป contamination จากสถานะ Culture</b><div class="auto-mini">ทั้งหมด ${contam.length}/${cs.length||0} รายการ (${pct(v.contamRate)})</div><div class="auto-mini">ตามสูตร: ${formulaTxt}</div><div class="auto-mini">ตามชนิดพืช: ${plantTxt}</div></div>`+contam.slice(0,10).map(c=>`<div class="auto-insight-row"><b>${esc(c.id)} — ${esc(c.plant||'')}</b><div class="auto-mini">${esc(safeFormula(c))} · อายุ ${days(c)} วัน · บันทึกจากสถานะเดิม ไม่ต้องคีย์ซ้ำ</div></div>`).join('');}
+    const al=document.getElementById('advancedAuditList'); if(al){const logs=(typeof DB?.auditLogs==='function'?DB.auditLogs():[]).slice().sort((a,b)=>new Date(b.date||b.createdAt)-new Date(a.date||a.createdAt)).slice(0,30); al.innerHTML=logs.length?logs.map(a=>`<div class="tl-item" style="padding-bottom:10px"><div class="tl-dot"></div><div class="tl-date">${fmtDate(a.date||a.createdAt)}</div><div class="tl-text">${esc(a.action)}</div><div class="tl-sub">${esc(a.userName||a.ownerName||'')} · ${esc(a.detail||'')}</div></div>`).join(''):'<div class="empty"><div class="empty-text">Audit Log จะถูกสร้างอัตโนมัติเมื่อมีการเพิ่ม/แก้ไข/ลบข้อมูล</div></div>';}};
+  window.renderAdvancedAnalytics=function(){removeDuplicateButtons(); const cs=getCultures(); const draw=(id,labels,data)=>{try{const el=document.getElementById(id); if(!el||!window.Chart)return; if(window['_auto_'+id])window['_auto_'+id].destroy(); window['_auto_'+id]=new Chart(el,{type:'bar',data:{labels,datasets:[{data}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{y:{beginAtZero:true}}}});}catch(e){}}; const byFormula=groupBy(cs,safeFormula); draw('advancedMediaChart',Object.keys(byFormula),Object.values(byFormula).map(a=>a.filter(isContam).length)); const byAge={'0-7d':0,'8-14d':0,'15-21d':0,'22-30d':0,'31d+':0}; cs.forEach(c=>{const d=days(c); byAge[d<=7?'0-7d':d<=14?'8-14d':d<=21?'15-21d':d<=30?'22-30d':'31d+']++;}); draw('advancedGrowthChart',Object.keys(byAge),Object.values(byAge)); const byPlant=groupBy(cs.filter(isContam),c=>c.plant||'ไม่ระบุ'); draw('advancedContamChart',Object.keys(byPlant),Object.values(byPlant).map(a=>a.length));};
+  const prevShowPage=window.showPage; if(prevShowPage&&!window.__autoAdvancedShowPagePatched){window.__autoAdvancedShowPagePatched=true; window.showPage=function(name){prevShowPage(name); setTimeout(()=>{removeDuplicateButtons(); renderAdvancedDashboard(); if(name==='analytics')renderAdvancedAnalytics(); if(name==='lab')renderAdvancedLab();},150);};}
+  const prevRefresh=window.refreshCurrentPage; if(prevRefresh&&!window.__autoAdvancedRefreshPatched){window.__autoAdvancedRefreshPatched=true; window.refreshCurrentPage=function(){prevRefresh(); setTimeout(()=>{removeDuplicateButtons(); renderAdvancedDashboard(); if(window.currentPage==='analytics')renderAdvancedAnalytics(); if(window.currentPage==='lab')renderAdvancedLab();},100);};}
+  const prevShowDetail=window.showDetail; if(prevShowDetail&&!window.__autoAdvancedDetailPatched){window.__autoAdvancedDetailPatched=true; window.showDetail=function(id){prevShowDetail(id); setTimeout(()=>{removeDuplicateButtons(); const c=(typeof DB?.allCultures==='function'?DB.allCultures():getCultures()).find(x=>x.id===id); const block=document.getElementById('advancedDetailBlock'); if(c&&block){const a=actionFor(c); block.querySelectorAll('.adv-actions').forEach(x=>x.remove()); if(!block.querySelector('.auto-recommend'))block.insertAdjacentHTML('beforeend',`<div class="adv-risk auto-recommend ${a.level==='danger'?'danger':''}" style="margin-top:8px"><b>Recommended Action</b><div class="adv-mini">${esc(a.text)} · ระบบคำนวณจากข้อมูลเดิม ไม่ต้องกรอกซ้ำ</div></div>`);}},220);};}
+  document.addEventListener('DOMContentLoaded',()=>setTimeout(()=>{removeDuplicateButtons(); renderAdvancedDashboard(); renderAdvancedLab();},500));
+})();
+</script>
+
 </body>
 </html>
