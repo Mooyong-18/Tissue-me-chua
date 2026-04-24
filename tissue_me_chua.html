@@ -754,7 +754,8 @@ function doLogin(){
   const email=document.getElementById('loginEmail').value.trim();
   const pass=document.getElementById('loginPass').value;
   const users=DB.users();
-  const user=users.find(u=>u.email===email&&u.pass===pass);
+  const user=users.find(u=>(u.email||'').toLowerCase()===email.toLowerCase()&&String(u.pass)===String(pass));
+
   const err=document.getElementById('loginError');
   if(!user){err.textContent='อีเมลหรือรหัสผ่านไม่ถูกต้อง';err.style.display='block';return}
   if(!user.approved){err.textContent='บัญชียังรอการอนุมัติจาก Admin';err.style.display='block';return}
