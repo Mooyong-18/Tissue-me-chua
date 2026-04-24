@@ -274,7 +274,12 @@ textarea.inp{resize:vertical;min-height:72px}
       </div>
       <div class="form-group">
         <label class="form-label">รหัสผ่าน</label>
-        <input class="inp" type="password" id="loginPass" placeholder="รหัสผ่าน" autocomplete="current-password"/>
+        <div style="position:relative">
+          <input class="inp" type="password" id="loginPass" placeholder="รหัสผ่าน" autocomplete="current-password" style="padding-right:42px"/>
+          <button type="button" onclick="togglePass('loginPass',this)" style="position:absolute;right:10px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;padding:6px;color:var(--text3);display:flex;align-items:center" aria-label="แสดง/ซ่อนรหัสผ่าน">
+            <svg id="loginPassIcon" width="18" height="18" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M1.5 10C3 6 6.2 4 10 4s7 2 8.5 6c-1.5 4-4.7 6-8.5 6s-7-2-8.5-6z"/><circle cx="10" cy="10" r="2.5"/></svg>
+          </button>
+        </div>
       </div>
       <div id="loginError" style="color:var(--danger);font-size:12px;margin-bottom:10px;display:none"></div>
       <button class="btn btn-primary" onclick="doLogin()">เข้าสู่ระบบ</button>
@@ -290,7 +295,12 @@ textarea.inp{resize:vertical;min-height:72px}
       </div>
       <div class="form-group">
         <label class="form-label">รหัสผ่าน <span class="form-req">*</span></label>
-        <input class="inp" type="password" id="regPass" placeholder="อย่างน้อย 6 ตัวอักษร"/>
+        <div style="position:relative">
+          <input class="inp" type="password" id="regPass" placeholder="อย่างน้อย 6 ตัวอักษร" style="padding-right:42px"/>
+          <button type="button" onclick="togglePass('regPass',this)" style="position:absolute;right:10px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;padding:6px;color:var(--text3);display:flex;align-items:center" aria-label="แสดง/ซ่อนรหัสผ่าน">
+            <svg id="regPassIcon" width="18" height="18" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M1.5 10C3 6 6.2 4 10 4s7 2 8.5 6c-1.5 4-4.7 6-8.5 6s-7-2-8.5-6z"/><circle cx="10" cy="10" r="2.5"/></svg>
+          </button>
+        </div>
       </div>
       <div id="regError" style="color:var(--danger);font-size:12px;margin-bottom:10px;display:none"></div>
       <button class="btn btn-primary" onclick="doRegister()">ส่งคำขอลงทะเบียน</button>
@@ -366,7 +376,10 @@ textarea.inp{resize:vertical;min-height:72px}
         <div style="font-size:16px;font-weight:600;margin-bottom:16px" id="addFormTitle">เพิ่ม Culture ใหม่</div>
         <div class="form-group">
           <label class="form-label">ชนิดพืช <span class="form-req">*</span></label>
-          <input class="inp" id="f_plant" type="text" placeholder="เช่น กล้วยไม้แวนด้า"/>
+          <select class="inp" id="f_plant">
+            <option value="">เลือกชนิดพืช</option>
+          </select>
+          <div style="font-size:11px;color:var(--text3);margin-top:4px">เพิ่มชนิดพืชได้ในหน้า "ตั้งค่า"</div>
         </div>
         <div class="form-row">
           <div class="form-group">
@@ -381,6 +394,18 @@ textarea.inp{resize:vertical;min-height:72px}
             <label class="form-label">สูตรอาหาร <span class="form-req">*</span></label>
             <select class="inp" id="f_formula">
               <option value="">เลือก</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">Subculture ครั้งที่</label>
+            <div class="inp-unit"><input class="inp" id="f_subnum" type="number" min="0" placeholder="0 = ต้นแม่"/><span>ครั้ง</span></div>
+          </div>
+          <div class="form-group">
+            <label class="form-label">มาจากขวด (Parent)</label>
+            <select class="inp" id="f_parent">
+              <option value="">ไม่มี (ต้นแม่)</option>
             </select>
           </div>
         </div>
@@ -497,14 +522,23 @@ textarea.inp{resize:vertical;min-height:72px}
           <div id="pendingUsers" style="margin-bottom:16px"></div>
           <div class="section-label">ผู้ใช้ทั้งหมด</div>
           <div id="allUsers" style="margin-bottom:16px"></div>
-          <div class="section-label">จัดการสูตรอาหาร</div>
-          <div class="card" style="margin-bottom:14px" id="formulaList"></div>
+          <div class="section-label">จัดการชนิดพืช</div>
+          <div class="card" style="margin-bottom:10px" id="plantList"></div>
           <div style="display:flex;gap:8px;margin-bottom:16px">
-            <input class="inp" id="newFormulaName" placeholder="ชื่อสูตร เช่น F6"/>
-            <input class="inp" id="newFormulaDesc" placeholder="รายละเอียด"/>
-            <button class="btn btn-outline btn-sm" onclick="addFormula()">+</button>
+            <input class="inp" id="newPlantName" placeholder="ชื่อพืช เช่น กล้วยไม้แวนด้า"/>
+            <button class="btn btn-outline btn-sm" onclick="addPlant()">+</button>
+          </div>
+          <div class="section-label">จัดการสูตรอาหาร</div>
+          <div class="card" style="margin-bottom:10px" id="formulaList"></div>
+          <div style="margin-bottom:16px">
+            <input class="inp" id="newFormulaName" placeholder="ชื่อสูตร เช่น F6" style="margin-bottom:6px"/>
+            <textarea class="inp" id="newFormulaDesc" placeholder="รายละเอียดสารที่ใช้ (ใส่หลายบรรทัดได้)&#10;MS + BAP 1mg/L&#10;Sucrose 30g/L&#10;Agar 7g/L" rows="4" style="margin-bottom:6px"></textarea>
+            <button class="btn btn-primary" onclick="addFormula()">เพิ่มสูตรอาหาร</button>
           </div>
         </div>
+        <div class="section-label">บันทึกข้อมูล (Notes)</div>
+        <div id="notesList" style="margin-bottom:10px"></div>
+        <button class="btn btn-outline btn-sm" onclick="openNoteModal()" style="margin-bottom:16px;width:100%">+ เพิ่มบันทึก</button>
         <div class="section-label">การตั้งค่า</div>
         <div class="card">
           <div class="setting-row">
@@ -619,6 +653,31 @@ textarea.inp{resize:vertical;min-height:72px}
   </div>
 </div>
 
+<!-- NOTE MODAL -->
+<div class="modal-overlay hidden" id="noteModal">
+  <div class="modal-sheet">
+    <div class="modal-handle"></div>
+    <div class="modal-header">
+      <div class="modal-title">บันทึก</div>
+      <button onclick="closeModal('noteModal')" style="font-size:18px;color:var(--text3)">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group">
+        <label class="form-label">หัวข้อ</label>
+        <input class="inp" id="noteTitle" type="text" placeholder="เช่น วิธีฟอก Clorox 15%"/>
+      </div>
+      <div class="form-group">
+        <label class="form-label">เนื้อหา</label>
+        <textarea class="inp" id="noteContent" rows="12" placeholder="เขียนบันทึกได้ตามต้องการ..." style="font-family:inherit;line-height:1.5"></textarea>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('noteModal')">ยกเลิก</button>
+      <button class="btn btn-primary" onclick="saveNote()">บันทึก</button>
+    </div>
+  </div>
+</div>
+
 <!-- LIGHTBOX -->
 <div class="lightbox hidden" id="lightbox" onclick="closeLightbox()">
   <span class="lightbox-close">✕</span>
@@ -682,16 +741,48 @@ const DB = {
     this._users=this._users.filter(u=>u.id!==id);
   },
 
+  _plants:[],
+  plants(){return this._plants},
+  async savePlant(p){
+    const{db,doc,setDoc}=FS;
+    await setDoc(doc(db,'plants',p.id),p);
+    const idx=this._plants.findIndex(x=>x.id===p.id);
+    if(idx>-1)this._plants[idx]=p;else this._plants.push(p);
+  },
+  async deletePlantById(id){
+    const{db,doc,deleteDoc}=FS;
+    await deleteDoc(doc(db,'plants',id));
+    this._plants=this._plants.filter(p=>p.id!==id);
+  },
+
+  _notes:[],
+  notes(){return this._notes},
+  async saveNote(n){
+    const{db,doc,setDoc}=FS;
+    await setDoc(doc(db,'notes',n.id),n);
+    const idx=this._notes.findIndex(x=>x.id===n.id);
+    if(idx>-1)this._notes[idx]=n;else this._notes.push(n);
+  },
+  async deleteNoteById(id){
+    const{db,doc,deleteDoc}=FS;
+    await deleteDoc(doc(db,'notes',id));
+    this._notes=this._notes.filter(n=>n.id!==id);
+  },
+
   async loadAll(){
     const{db,collection,getDocs,query,orderBy}=FS;
-    const [cu,tu,uu]=await Promise.all([
+    const [cu,tu,uu,pu,nu]=await Promise.all([
       getDocs(collection(db,'cultures')),
       getDocs(collection(db,'temps')),
-      getDocs(collection(db,'users'))
+      getDocs(collection(db,'users')),
+      getDocs(collection(db,'plants')),
+      getDocs(collection(db,'notes'))
     ]);
     this._cultures=cu.docs.map(d=>d.data());
     this._temps=tu.docs.map(d=>d.data()).sort((a,b)=>a.datetime.localeCompare(b.datetime));
     this._users=uu.docs.map(d=>d.data());
+    this._plants=pu.docs.map(d=>d.data());
+    this._notes=nu.docs.map(d=>d.data());
   },
 
   nextCultureId(){
@@ -709,6 +800,13 @@ async function seedDemo(){
   const saSnap=await getDoc(saRef);
   if(!saSnap.exists()){
     await setDoc(saRef,{id:'SUPERADMIN',name:'สาธิต ฉัตรพันธุ์',email:'Satit.c@psru.ac.th',pass:'254102',role:'admin',approved:true,avatar:'ส',superadmin:true});
+  }
+  // Seed default plants if empty
+  if(DB._plants.length===0){
+    const defaultPlants=['กล้วยไม้แวนด้า','กุหลาบ','มะเขือเทศ Cherry','มะเดื่อ','สับปะรด','ขมิ้น'];
+    for(const name of defaultPlants){
+      await DB.savePlant({id:'p'+Date.now()+'_'+Math.random().toString(36).slice(2,6),name});
+    }
   }
   // Only seed cultures if none exist
   if(DB._cultures.length>0)return;
@@ -745,6 +843,19 @@ let pendingPhotosUpdate=[];
 // ──────────────────────────────────────────────
 // AUTH
 // ──────────────────────────────────────────────
+function togglePass(inpId,btn){
+  const inp=document.getElementById(inpId);
+  if(!inp)return;
+  const showing=inp.type==='text';
+  inp.type=showing?'password':'text';
+  const svg=btn.querySelector('svg');
+  if(svg){
+    svg.innerHTML=showing
+      ?'<path d="M1.5 10C3 6 6.2 4 10 4s7 2 8.5 6c-1.5 4-4.7 6-8.5 6s-7-2-8.5-6z"/><circle cx="10" cy="10" r="2.5"/>'
+      :'<path d="M1.5 10C3 6 6.2 4 10 4s7 2 8.5 6c-1.5 4-4.7 6-8.5 6s-7-2-8.5-6z"/><circle cx="10" cy="10" r="2.5"/><line x1="3" y1="3" x2="17" y2="17" stroke-linecap="round"/>';
+  }
+}
+
 function switchAuthTab(tab){
   document.querySelectorAll('.tab-btn').forEach((b,i)=>b.classList.toggle('active',i===(tab==='login'?0:1)));
   document.getElementById('loginForm').classList.toggle('hidden',tab!=='login');
@@ -755,17 +866,19 @@ function doLogin(){
   const pass=document.getElementById('loginPass').value;
   const users=DB.users();
   const user=users.find(u=>(u.email||'').toLowerCase()===email.toLowerCase()&&String(u.pass)===String(pass));
-
   const err=document.getElementById('loginError');
   if(!user){err.textContent='อีเมลหรือรหัสผ่านไม่ถูกต้อง';err.style.display='block';return}
   if(!user.approved){err.textContent='บัญชียังรอการอนุมัติจาก Admin';err.style.display='block';return}
   err.style.display='none';
   currentUser=user;
+  // Persist session
+  try{localStorage.setItem('tmc_session',JSON.stringify({id:user.id,email:user.email,time:Date.now()}));}catch(e){}
   document.getElementById('login-page').classList.add('hidden');
   document.getElementById('app').classList.remove('hidden');
   document.getElementById('userAvatar').textContent=user.avatar||user.name[0];
   document.getElementById('mainFab').classList.remove('hidden');
   initApp();
+  setupRealtimeSync();
 }
 async function doRegister(){
   const name=document.getElementById('regName').value.trim();
@@ -774,7 +887,7 @@ async function doRegister(){
   const err=document.getElementById('regError');
   if(!name||!email||!pass){err.textContent='กรุณากรอกข้อมูลให้ครบ';err.style.display='block';return}
   if(pass.length<6){err.textContent='รหัสผ่านต้องมีอย่างน้อย 6 ตัวอักษร';err.style.display='block';return}
-  if(DB.users().find(u=>u.email===email)){err.textContent='อีเมลนี้ถูกใช้งานแล้ว';err.style.display='block';return}
+  if(DB.users().find(u=>(u.email||"").toLowerCase()===email.toLowerCase())){err.textContent='อีเมลนี้ถูกใช้งานแล้ว';err.style.display='block';return}
   err.style.display='none';
   try{
     await doRegisterFirestore(name,email,pass);
@@ -783,7 +896,9 @@ async function doRegister(){
   }catch(e){err.textContent='เกิดข้อผิดพลาด กรุณาลองใหม่';err.style.display='block';}
 }
 function doLogout(){
+  if(!confirm('ออกจากระบบใช่ไหม?'))return;
   currentUser=null;
+  try{localStorage.removeItem('tmc_session');}catch(e){}
   document.getElementById('app').classList.add('hidden');
   document.getElementById('login-page').classList.remove('hidden');
   document.getElementById('loginEmail').value='';
@@ -819,8 +934,28 @@ function setDefaultDates(){
 
 function populateFormulaSelect(){
   const sel=document.getElementById('f_formula');
-  sel.innerHTML='<option value="">เลือก</option>';
-  DB.formulas().forEach(f=>{sel.innerHTML+=`<option value="${f.name}">${f.name} — ${f.desc}</option>`});
+  if(sel){
+    const curr=sel.value;
+    sel.innerHTML='<option value="">เลือก</option>';
+    DB.formulas().forEach(f=>{sel.innerHTML+=`<option value="${f.name}">${f.name} — ${(f.desc||'').replace(/\n/g,' • ')}</option>`});
+    if(curr)sel.value=curr;
+  }
+  // Plants
+  const ps=document.getElementById('f_plant');
+  if(ps){
+    const curr=ps.value;
+    ps.innerHTML='<option value="">เลือกชนิดพืช</option>';
+    DB.plants().forEach(p=>{ps.innerHTML+=`<option value="${p.name}">${p.name}</option>`});
+    if(curr)ps.value=curr;
+  }
+  // Parent culture (ongoing cultures only)
+  const pa=document.getElementById('f_parent');
+  if(pa){
+    const curr=pa.value;
+    pa.innerHTML='<option value="">ไม่มี (ต้นแม่)</option>';
+    DB.cultures().slice().reverse().forEach(c=>{pa.innerHTML+=`<option value="${c.id}">${c.id} — ${c.plant}</option>`});
+    if(curr)pa.value=curr;
+  }
 }
 
 // ──────────────────────────────────────────────
@@ -996,6 +1131,8 @@ function showDetail(id){
         <div><div style="font-size:10px;color:var(--text3);margin-bottom:2px">Duration</div><div style="font-size:13px;font-weight:500;color:var(--accent)">${days} วัน</div></div>
         <div><div style="font-size:10px;color:var(--text3);margin-bottom:2px">Due Date</div><div style="font-size:13px;font-weight:500">${c.dueDate?formatDate(c.dueDate):'—'}</div></div>
         <div><div style="font-size:10px;color:var(--text3);margin-bottom:2px">ผู้ทำ</div><div style="font-size:13px;font-weight:500">${c.operator||'—'}</div></div>
+        <div><div style="font-size:10px;color:var(--text3);margin-bottom:2px">Subculture</div><div style="font-size:13px;font-weight:500">${c.subnum?('ครั้งที่ '+c.subnum):'ต้นแม่'}</div></div>
+        ${c.parentId?`<div><div style="font-size:10px;color:var(--text3);margin-bottom:2px">มาจากขวด</div><a onclick="showDetail('${c.parentId}')" style="font-size:13px;font-weight:500;color:var(--accent);cursor:pointer;text-decoration:underline">${c.parentId}</a></div>`:''}
         ${c.closedDate?`<div style="grid-column:span 2"><div style="font-size:10px;color:var(--text3);margin-bottom:2px">วันที่ปิด</div><div style="font-size:13px;font-weight:500;color:var(--danger)">${formatDate(c.closedDate)}</div></div>`:''}
         ${lastU&&lastU.shoots!==undefined?`<div><div style="font-size:10px;color:var(--text3);margin-bottom:2px">ยอด (ล่าสุด)</div><div style="font-size:13px;font-weight:500">${lastU.shoots} ยอด</div></div>`:''}
         ${lastU&&lastU.roots!==undefined?`<div><div style="font-size:10px;color:var(--text3);margin-bottom:2px">ราก (ล่าสุด)</div><div style="font-size:13px;font-weight:500">${lastU.roots} ราก</div></div>`:''}
@@ -1066,7 +1203,7 @@ function showDetail(id){
 // ADD / EDIT CULTURE
 // ──────────────────────────────────────────────
 function resetAddForm(){
-  ['f_plant','f_explant','f_formula','f_operator','f_tags','f_note'].forEach(id=>{document.getElementById(id).value='';});
+  ['f_plant','f_explant','f_formula','f_operator','f_tags','f_note','f_subnum','f_parent'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
   setDefaultDates();
   pendingPhotosAdd=[];
   document.getElementById('addPhotosPreview').innerHTML='';
@@ -1080,14 +1217,18 @@ function editCulture(id){
   currentDetailId=id;
   showPage('add');
   document.getElementById('addFormTitle').textContent='แก้ไข Culture';
-  document.getElementById('f_plant').value=c.plant;
-  document.getElementById('f_explant').value=c.explant;
-  document.getElementById('f_startdate').value=c.startDate;
-  document.getElementById('f_duedate').value=c.dueDate||'';
-  document.getElementById('f_operator').value=c.operator||'';
-  document.getElementById('f_tags').value=(c.tags||[]).join(' ');
-  document.getElementById('f_note').value=c.note||'';
-  setTimeout(()=>{ document.getElementById('f_formula').value=c.formula; },50);
+  setTimeout(()=>{
+    document.getElementById('f_plant').value=c.plant;
+    document.getElementById('f_explant').value=c.explant;
+    document.getElementById('f_startdate').value=c.startDate;
+    document.getElementById('f_duedate').value=c.dueDate||'';
+    document.getElementById('f_operator').value=c.operator||'';
+    document.getElementById('f_tags').value=(c.tags||[]).join(' ');
+    document.getElementById('f_note').value=c.note||'';
+    document.getElementById('f_subnum').value=c.subnum||0;
+    document.getElementById('f_parent').value=c.parentId||'';
+    document.getElementById('f_formula').value=c.formula;
+  },50);
 }
 
 async function saveCulture(){
@@ -1096,11 +1237,14 @@ async function saveCulture(){
   const formula=document.getElementById('f_formula').value;
   const startDate=document.getElementById('f_startdate').value;
   if(!plant||!explant||!formula||!startDate){showToast('กรุณากรอกข้อมูลที่จำเป็น');return;}
+  const subnumRaw=document.getElementById('f_subnum').value;
+  const subnum=subnumRaw!==''?parseInt(subnumRaw):0;
+  const parentId=document.getElementById('f_parent').value||null;
   showToast('กำลังบันทึก...');
   if(editMode&&currentDetailId){
     const c=DB.cultures().find(x=>x.id===currentDetailId);
     if(c){
-      const updated={...c,plant,explant,formula,startDate,dueDate:document.getElementById('f_duedate').value||null,operator:document.getElementById('f_operator').value.trim(),tags:document.getElementById('f_tags').value.trim().split(/\s+/).filter(Boolean),note:document.getElementById('f_note').value.trim()};
+      const updated={...c,plant,explant,formula,startDate,dueDate:document.getElementById('f_duedate').value||null,operator:document.getElementById('f_operator').value.trim(),tags:document.getElementById('f_tags').value.trim().split(/\s+/).filter(Boolean),note:document.getElementById('f_note').value.trim(),subnum,parentId};
       if(pendingPhotosAdd.length)updated.photos=[...(c.photos||[]),...pendingPhotosAdd];
       await DB.saveCulture(updated);
     }
@@ -1109,7 +1253,7 @@ async function saveCulture(){
     showDetail(currentDetailId);
   } else {
     const id=DB.nextCultureId();
-    const newC={id,plant,explant,formula,startDate,dueDate:document.getElementById('f_duedate').value||null,operator:document.getElementById('f_operator').value.trim(),tags:document.getElementById('f_tags').value.trim().split(/\s+/).filter(Boolean),note:document.getElementById('f_note').value.trim(),status:'growing_normal',closedDate:null,updates:[],photos:pendingPhotosAdd.slice()};
+    const newC={id,plant,explant,formula,startDate,dueDate:document.getElementById('f_duedate').value||null,operator:document.getElementById('f_operator').value.trim(),tags:document.getElementById('f_tags').value.trim().split(/\s+/).filter(Boolean),note:document.getElementById('f_note').value.trim(),status:'growing_normal',closedDate:null,updates:[],photos:pendingPhotosAdd.slice(),subnum,parentId};
     await DB.saveCulture(newC);
     pendingPhotosAdd=[];
     showToast('บันทึก Culture '+id+' สำเร็จ');
@@ -1331,7 +1475,9 @@ function renderSettings(){
     document.getElementById('adminSection').classList.remove('hidden');
     renderUserManagement();
     renderFormulaList();
+    renderPlantList();
   }
+  renderNotesList();
 }
 
 function renderUserManagement(){
@@ -1420,7 +1566,7 @@ async function adminAddUser(){
   const role=document.getElementById('adminNewRole').value;
   if(!name||!email||!pass){showToast('กรุณากรอกข้อมูลให้ครบ');return;}
   if(pass.length<6){showToast('รหัสผ่านต้องมีอย่างน้อย 6 ตัวอักษร');return;}
-  if(DB.users().find(u=>u.email===email)){showToast('อีเมลนี้ถูกใช้งานแล้ว');return;}
+  if(DB.users().find(u=>(u.email||"").toLowerCase()===email.toLowerCase())){showToast('อีเมลนี้ถูกใช้งานแล้ว');return;}
   const newUser={id:'u'+Date.now(),name,email,pass,role,approved:true,avatar:name[0]};
   await DB.saveUser(newUser);
   document.getElementById('adminNewName').value='';
@@ -1437,17 +1583,23 @@ async function doRegisterFirestore(name,email,pass){
 
 function renderFormulaList(){
   const formulas=DB.formulas();
-  document.getElementById('formulaList').innerHTML=formulas.map((f,i)=>`<div style="display:flex;justify-content:space-between;align-items:center;padding:10px 0;${i>0?'border-top:1px solid var(--border)':''}">
-    <div><div style="font-size:13px;font-weight:500">${f.name}</div><div style="font-size:11px;color:var(--text3)">${f.desc}</div></div>
-    <button onclick="deleteFormula('${f.id}')" style="color:var(--danger);font-size:12px;padding:4px 8px">ลบ</button>
-  </div>`).join('');
+  document.getElementById('formulaList').innerHTML=formulas.length?formulas.map((f,i)=>`<div style="padding:10px 0;${i>0?'border-top:1px solid var(--border)':''}">
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px">
+      <div style="flex:1;min-width:0">
+        <div style="font-size:14px;font-weight:600;color:var(--text);margin-bottom:4px">${f.name}</div>
+        <div style="font-size:12px;color:var(--text2);white-space:pre-wrap;line-height:1.5">${(f.desc||'').replace(/</g,'&lt;')}</div>
+      </div>
+      <button onclick="deleteFormula('${f.id}')" style="color:var(--danger);font-size:11px;padding:4px 8px;background:var(--danger-light);border:none;border-radius:6px;cursor:pointer;flex-shrink:0">ลบ</button>
+    </div>
+  </div>`).join(''):'<div style="font-size:12px;color:var(--text3);padding:8px 0">ยังไม่มีสูตรอาหาร</div>';
 }
 
 function addFormula(){
   const name=document.getElementById('newFormulaName').value.trim();
   const desc=document.getElementById('newFormulaDesc').value.trim();
-  if(!name)return;
+  if(!name){showToast('กรุณากรอกชื่อสูตร');return;}
   const formulas=DB.formulas();
+  if(formulas.find(f=>f.name===name)){showToast('ชื่อสูตรซ้ำ');return;}
   formulas.push({id:'f'+Date.now(),name,desc});
   DB.saveFormulas(formulas);
   document.getElementById('newFormulaName').value='';
@@ -1458,8 +1610,95 @@ function addFormula(){
 }
 
 function deleteFormula(id){
+  if(!confirm('ลบสูตรนี้ใช่ไหม?'))return;
   DB.saveFormulas(DB.formulas().filter(f=>f.id!==id));
   renderFormulaList();populateFormulaSelect();
+}
+
+// Plant management
+function renderPlantList(){
+  const plants=DB.plants();
+  const el=document.getElementById('plantList');
+  if(!el)return;
+  el.innerHTML=plants.length?plants.map((p,i)=>`<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;${i>0?'border-top:1px solid var(--border)':''}">
+    <div style="font-size:13px">${p.name}</div>
+    <div style="display:flex;gap:4px">
+      <button onclick="editPlant('${p.id}')" style="color:var(--info);font-size:11px;padding:4px 8px;background:var(--info-light);border:none;border-radius:6px;cursor:pointer">แก้ไข</button>
+      <button onclick="deletePlant('${p.id}')" style="color:var(--danger);font-size:11px;padding:4px 8px;background:var(--danger-light);border:none;border-radius:6px;cursor:pointer">ลบ</button>
+    </div>
+  </div>`).join(''):'<div style="font-size:12px;color:var(--text3);padding:8px 0">ยังไม่มีชนิดพืช</div>';
+}
+
+async function addPlant(){
+  const name=document.getElementById('newPlantName').value.trim();
+  if(!name){showToast('กรุณากรอกชื่อพืช');return;}
+  if(DB.plants().find(p=>p.name===name)){showToast('ชื่อพืชซ้ำ');return;}
+  await DB.savePlant({id:'p'+Date.now(),name});
+  document.getElementById('newPlantName').value='';
+  renderPlantList();
+  populateFormulaSelect();
+  showToast('เพิ่ม '+name+' แล้ว');
+}
+
+async function editPlant(id){
+  const p=DB.plants().find(x=>x.id===id);
+  if(!p)return;
+  const newName=prompt('แก้ไขชื่อพืช:',p.name);
+  if(!newName||newName.trim()===''||newName.trim()===p.name)return;
+  await DB.savePlant({...p,name:newName.trim()});
+  renderPlantList();populateFormulaSelect();
+  showToast('แก้ไขแล้ว');
+}
+
+async function deletePlant(id){
+  if(!confirm('ลบชนิดพืชนี้ใช่ไหม?'))return;
+  await DB.deletePlantById(id);
+  renderPlantList();populateFormulaSelect();
+  showToast('ลบแล้ว');
+}
+
+// Notes management
+function renderNotesList(){
+  const notes=DB.notes().slice().sort((a,b)=>(b.updatedAt||0)-(a.updatedAt||0));
+  const el=document.getElementById('notesList');
+  if(!el)return;
+  el.innerHTML=notes.length?notes.map(n=>`<div class="card" style="margin-bottom:8px;cursor:pointer" onclick="openNoteModal('${n.id}')">
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px">
+      <div style="flex:1;min-width:0">
+        <div style="font-size:14px;font-weight:600;color:var(--text);margin-bottom:4px">${(n.title||'ไม่มีชื่อ').replace(/</g,'&lt;')}</div>
+        <div style="font-size:12px;color:var(--text2);white-space:pre-wrap;line-height:1.5;max-height:60px;overflow:hidden">${(n.content||'').replace(/</g,'&lt;').substring(0,200)}</div>
+        <div style="font-size:10px;color:var(--text3);margin-top:6px">${n.updatedAt?formatDateTime(new Date(n.updatedAt).toISOString().slice(0,16)):''}</div>
+      </div>
+      <button onclick="event.stopPropagation();deleteNote('${n.id}')" style="color:var(--danger);font-size:11px;padding:4px 8px;background:var(--danger-light);border:none;border-radius:6px;cursor:pointer;flex-shrink:0">ลบ</button>
+    </div>
+  </div>`).join(''):'<div style="font-size:12px;color:var(--text3);padding:8px 0">ยังไม่มีบันทึก</div>';
+}
+
+let currentNoteId=null;
+function openNoteModal(id){
+  currentNoteId=id||null;
+  const note=id?DB.notes().find(n=>n.id===id):null;
+  document.getElementById('noteTitle').value=note?note.title||'':'';
+  document.getElementById('noteContent').value=note?note.content||'':'';
+  document.getElementById('noteModal').classList.remove('hidden');
+}
+
+async function saveNote(){
+  const title=document.getElementById('noteTitle').value.trim();
+  const content=document.getElementById('noteContent').value.trim();
+  if(!title&&!content){showToast('กรุณากรอกข้อมูล');return;}
+  const n={id:currentNoteId||'n'+Date.now(),title,content,updatedAt:Date.now()};
+  await DB.saveNote(n);
+  closeModal('noteModal');
+  renderNotesList();
+  showToast('บันทึกแล้ว');
+}
+
+async function deleteNote(id){
+  if(!confirm('ลบบันทึกนี้ใช่ไหม?'))return;
+  await DB.deleteNoteById(id);
+  renderNotesList();
+  showToast('ลบแล้ว');
 }
 
 function toggleDarkMode(el){
@@ -1489,20 +1728,73 @@ window.addEventListener('DOMContentLoaded',()=>{
   // Wait for Firebase module to be ready
   function onFbReady(){
     // Pre-load users for login check (lightweight)
-    const{db,collection,getDocs}=FS;
+    const{db,collection,getDocs,onSnapshot,doc,setDoc}=FS;
     getDocs(collection(db,'users')).then(snap=>{
       DB._users=snap.docs.map(d=>d.data());
       // Ensure superadmin exists
       if(!DB._users.find(u=>u.superadmin)){
-        const{doc,setDoc}=FS;
         const sa={id:'SUPERADMIN',name:'สาธิต ฉัตรพันธุ์',email:'Satit.c@psru.ac.th',pass:'254102',role:'admin',approved:true,avatar:'ส',superadmin:true};
         setDoc(doc(db,'users','SUPERADMIN'),sa).then(()=>{DB._users.push(sa);});
       }
+      // Auto-login from saved session
+      try{
+        const sess=JSON.parse(localStorage.getItem('tmc_session')||'null');
+        if(sess&&sess.id){
+          // Session expires after 30 days
+          if(Date.now()-sess.time<30*86400000){
+            const user=DB._users.find(u=>u.id===sess.id&&u.email===sess.email);
+            if(user&&user.approved){
+              currentUser=user;
+              document.getElementById('login-page').classList.add('hidden');
+              document.getElementById('app').classList.remove('hidden');
+              document.getElementById('userAvatar').textContent=user.avatar||user.name[0];
+              document.getElementById('mainFab').classList.remove('hidden');
+              initApp();
+              setupRealtimeSync();
+              return;
+            }
+          } else {
+            localStorage.removeItem('tmc_session');
+          }
+        }
+      }catch(e){console.warn('session restore failed',e);}
     });
   }
   if(window._fbReady)onFbReady();
   else window.addEventListener('fbReady',onFbReady);
 });
+
+// Realtime sync — listens to Firestore changes and updates UI live
+let _unsubCultures=null, _unsubTemps=null, _unsubUsers=null;
+function setupRealtimeSync(){
+  const{db,collection,onSnapshot}=FS;
+  if(_unsubCultures)_unsubCultures();
+  if(_unsubTemps)_unsubTemps();
+  if(_unsubUsers)_unsubUsers();
+  _unsubCultures=onSnapshot(collection(db,'cultures'),snap=>{
+    DB._cultures=snap.docs.map(d=>d.data());
+    refreshCurrentPage();
+  });
+  _unsubTemps=onSnapshot(collection(db,'temps'),snap=>{
+    DB._temps=snap.docs.map(d=>d.data()).sort((a,b)=>a.datetime.localeCompare(b.datetime));
+    if(currentPage==='temp'||currentPage==='dashboard')refreshCurrentPage();
+  });
+  _unsubUsers=onSnapshot(collection(db,'users'),snap=>{
+    DB._users=snap.docs.map(d=>d.data());
+    if(currentPage==='settings')renderSettings();
+  });
+}
+
+function refreshCurrentPage(){
+  try{
+    if(currentPage==='dashboard')renderDashboard();
+    else if(currentPage==='list'){renderFilters();renderList();}
+    else if(currentPage==='temp'){renderTempHistory();renderTempChart();}
+    else if(currentPage==='alerts')renderAlerts();
+    else if(currentPage==='settings')renderSettings();
+    else if(currentPage==='detail'&&currentDetailId)showDetail(currentDetailId);
+  }catch(e){console.warn('refresh failed',e);}
+}
 </script>
 </body>
 </html>
