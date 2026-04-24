@@ -881,11 +881,24 @@ const DB = {
     {id:'f4',name:'F4',desc:'MS + 2,4-D 1mg/L'},
     {id:'f5',name:'F5',desc:'MS เต็มสูตร'}
   ],
-  cultures(){return this._cultures},
+  cultures(){
+    return this._cultures.filter(c=>canSeeItem(c,'cultures'));
+  },
+  allCultures(){return this._cultures;},
   temps(){return this._temps},
   users(){return this._users},
-  formulas(){return JSON.parse(localStorage.getItem('tmc_formulas')||'null')||this._formulas},
-  saveFormulas(d){localStorage.setItem('tmc_formulas',JSON.stringify(d));this._formulas=d;},
+  formulas(){return this._formulas},
+  async saveFormula(f){
+    const{db,doc,setDoc}=FS;
+    await setDoc(doc(db,'formulas',f.id),f);
+    const idx=this._formulas.findIndex(x=>x.id===f.id);
+    if(idx>-1)this._formulas[idx]=f;else this._formulas.push(f);
+  },
+  async deleteFormulaById(id){
+    const{db,doc,deleteDoc}=FS;
+    await deleteDoc(doc(db,'formulas',id));
+    this._formulas=this._formulas.filter(f=>f.id!==id);
+  },
 
   async saveCulture(c){
     const{db,doc,setDoc}=FS;
@@ -932,7 +945,8 @@ const DB = {
   },
 
   _notes:[],
-  notes(){return this._notes},
+  notes(){return this._notes.filter(n=>canSeeItem(n,'notes'));},
+  allNotes(){return this._notes;},
   async saveNote(n){
     const{db,doc,setDoc}=FS;
     await setDoc(doc(db,'notes',n.id),n);
@@ -946,11 +960,12 @@ const DB = {
   },
 
   async loadAll(){
-    const{db,collection,getDocs}=FS;
-    const [cu,tu,uu,pu,nu,iv,pr,sc]=await Promise.all([
+    const{db,collection,getDocs,doc,setDoc}=FS;
+    const [cu,tu,uu,fu,pu,nu,iv,pr,sc]=await Promise.all([
       getDocs(collection(db,'cultures')),
       getDocs(collection(db,'temps')),
       getDocs(collection(db,'users')),
+      getDocs(collection(db,'formulas')),
       getDocs(collection(db,'plants')),
       getDocs(collection(db,'notes')),
       getDocs(collection(db,'inventory')),
@@ -960,6 +975,29 @@ const DB = {
     this._cultures=cu.docs.map(d=>d.data());
     this._temps=tu.docs.map(d=>d.data()).sort((a,b)=>a.datetime.localeCompare(b.datetime));
     this._users=uu.docs.map(d=>d.data());
+    this._formulas=fu.docs.map(d=>d.data());
+
+    // Migrate: ถ้า Firestore ยังไม่มีสูตร ให้ย้ายจาก localStorage หรือใช้ค่าเริ่มต้น
+    if(this._formulas.length===0){
+      let local=[];
+      try{local=JSON.parse(localStorage.getItem('tmc_formulas')||'[]')||[];}catch(e){}
+      const seed=local.length?local:[
+        {id:'f1',name:'F1',desc:'MS + BAP 1mg/L'},
+        {id:'f2',name:'F2',desc:'MS + NAA 0.5mg/L'},
+        {id:'f3',name:'F3',desc:'WPM + Kinetin 2mg/L'},
+        {id:'f4',name:'F4',desc:'MS + 2,4-D 1mg/L'},
+        {id:'f5',name:'F5',desc:'MS เต็มสูตร'}
+      ];
+      for(const f of seed){
+        const safe={id:f.id||('f'+Date.now()+'_'+Math.random().toString(36).slice(2,6)),name:f.name||'',desc:f.desc||''};
+        if(safe.name) await setDoc(doc(db,'formulas',safe.id),safe);
+      }
+      const fu2=await getDocs(collection(db,'formulas'));
+      this._formulas=fu2.docs.map(d=>d.data());
+      // Clear old localStorage after migration
+      try{localStorage.removeItem('tmc_formulas');}catch(e){}
+    }
+
     this._plants=pu.docs.map(d=>d.data());
     this._notes=nu.docs.map(d=>d.data());
     this._inventory=iv.docs.map(d=>d.data());
@@ -1066,6 +1104,85 @@ let tempChartInstance=null;
 let dashTempChartInstance=null;
 let pendingPhotosAdd=[];
 let pendingPhotosUpdate=[];
+
+// ──────────────────────────────────────────────
+// PERMISSION SYSTEM (ข้อ 2 & 3)
+// ──────────────────────────────────────────────
+const DEFAULT_PERMISSIONS={
+  viewAllCultures:false,   // เห็นข้อมูลทุกคน (false = เห็นแค่ของตัวเอง)
+  addCultures:true,        // เพิ่ม culture ได้
+  editCultures:true,       // แก้ไข culture ได้
+  deleteCultures:false,    // ลบ culture ได้
+  managePlants:false,      // จัดการชนิดพืช
+  manageFormulas:false,    // จัดการสูตรอาหาร
+  viewNotes:true,          // ดูบันทึก
+  editNotes:true,          // เพิ่ม/แก้ไขบันทึก
+  manageLabTools:false,    // จัดการ Schedule/Inventory/Protocol
+  manageUsers:false        // จัดการผู้ใช้
+};
+
+function getPerms(user=currentUser){
+  if(!user)return{...DEFAULT_PERMISSIONS};
+  // Admin/Superadmin มีสิทธิ์ทุกอย่าง
+  if(user.superadmin||user.role==='admin'){
+    return{viewAllCultures:true,addCultures:true,editCultures:true,deleteCultures:true,
+      managePlants:true,manageFormulas:true,viewNotes:true,editNotes:true,
+      manageLabTools:true,manageUsers:true,...(user.permissions||{})};
+  }
+  return{...DEFAULT_PERMISSIONS,...(user.permissions||{})};
+}
+function can(key){return!!getPerms()[key];}
+
+// ตรวจว่า item นี้เป็นของ currentUser หรือไม่
+function ownsItem(item){
+  if(!currentUser)return false;
+  if(!item)return false;
+  // ถ้า item ไม่มี ownerId = data เก่า ให้ทุกคนเห็นได้
+  if(!item.ownerId)return true;
+  return item.ownerId===currentUser.id;
+}
+
+// ตรวจว่า currentUser มีสิทธิ์ดู item นี้ไหม
+function canSeeItem(item,type='cultures'){
+  if(!currentUser)return false;
+  if(currentUser.superadmin||currentUser.role==='admin')return true;
+  if(type==='cultures')return can('viewAllCultures')||ownsItem(item);
+  if(type==='notes')return can('viewNotes')&&(can('viewAllCultures')||ownsItem(item));
+  return true;
+}
+
+// ตรวจว่า currentUser มีสิทธิ์แก้ไข item นี้ไหม
+function canEditItem(item,type='cultures'){
+  if(!currentUser)return false;
+  if(currentUser.superadmin||currentUser.role==='admin')return true;
+  if(type==='cultures')return can('editCultures')&&(can('viewAllCultures')||ownsItem(item));
+  if(type==='notes')return can('editNotes')&&(can('viewAllCultures')||ownsItem(item));
+  return false;
+}
+
+// สร้าง checkbox สำหรับ permission ใน UI
+function permissionCheckbox(user,key,label){
+  const checked=getPerms(user)[key]?'checked':'';
+  const disabled=(user.superadmin||user.role==='admin')?'disabled':'';
+  return`<label style="display:flex;align-items:center;gap:6px;font-size:11px;color:var(--text2);padding:3px 0;cursor:pointer">
+    <input type="checkbox" ${checked} ${disabled} style="width:14px;height:14px;accent-color:var(--accent)"
+      onchange="toggleUserPermission('${user.id}','${key}',this.checked)">
+    ${label}
+  </label>`;
+}
+
+async function toggleUserPermission(id,key,value){
+  const u=DB.users().find(x=>x.id===id);
+  if(!u||u.superadmin||u.role==='admin')return;
+  u.permissions={...DEFAULT_PERMISSIONS,...(u.permissions||{}),[key]:!!value};
+  await DB.saveUser(u);
+  showToast('อัปเดตสิทธิ์ '+u.name+' แล้ว');
+}
+
+function applyPermissionUI(){
+  const fab=document.getElementById('mainFab');
+  if(fab)fab.classList.toggle('hidden',currentPage!=='list'||!can('addCultures'));
+}
 
 // ──────────────────────────────────────────────
 // AUTH
@@ -1226,6 +1343,8 @@ function populateFormulaSelect(){
 // NAVIGATION
 // ──────────────────────────────────────────────
 function showPage(name){
+  // Permission guard
+  if(name==='add'&&!editMode&&!can('addCultures')){showToast('บัญชีนี้ไม่มีสิทธิ์เพิ่ม Culture');return;}
   document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
   document.querySelectorAll('.nav-btn').forEach(b=>b.classList.remove('active'));
   const p=document.getElementById('page-'+name);
@@ -1238,7 +1357,8 @@ function showPage(name){
   const titles={dashboard:'หน้าหลัก',list:'รายการ Culture',add:editMode?'แก้ไข Culture':'เพิ่ม Culture',analytics:'วิเคราะห์ข้อมูล',lab:'จัดการแล็บ',settings:'ตั้งค่า',detail:''};
   document.getElementById('topbarTitle').textContent=titles[name]||'';
   const fab=document.getElementById('mainFab');
-  fab.classList.toggle('hidden',name!=='list');
+  fab.classList.toggle('hidden',name!=='list'||!can('addCultures'));
+  applyPermissionUI();
 
   if(name==='dashboard')renderDashboard();
   if(name==='list'){renderFilters();renderList();}
@@ -1799,7 +1919,8 @@ async function saveCulture(){
   const parentId=document.getElementById('f_parent').value||null;
   showToast('กำลังบันทึก...');
   if(editMode&&currentDetailId){
-    const c=DB.cultures().find(x=>x.id===currentDetailId);
+    const c=DB.allCultures().find(x=>x.id===currentDetailId);
+    if(!canEditItem(c,'cultures')){showToast('บัญชีนี้ไม่มีสิทธิ์แก้ไข Culture นี้');return;}
     if(c){
       const updated={...c,plant,explant,formula,startDate,dueDate:document.getElementById('f_duedate').value||null,operator:document.getElementById('f_operator').value.trim(),tags:document.getElementById('f_tags').value.trim().split(/\s+/).filter(Boolean),note:document.getElementById('f_note').value.trim(),subnum,parentId};
       if(pendingPhotosAdd.length)updated.photos=[...(c.photos||[]),...pendingPhotosAdd];
@@ -1810,7 +1931,7 @@ async function saveCulture(){
     showDetail(currentDetailId);
   } else {
     const id=DB.nextCultureId();
-    const newC={id,plant,explant,formula,startDate,dueDate:document.getElementById('f_duedate').value||null,operator:document.getElementById('f_operator').value.trim(),tags:document.getElementById('f_tags').value.trim().split(/\s+/).filter(Boolean),note:document.getElementById('f_note').value.trim(),status:'growing_normal',closedDate:null,updates:[],photos:pendingPhotosAdd.slice(),subnum,parentId};
+    const newC={id,ownerId:currentUser?.id||'',ownerName:currentUser?.name||'',plant,explant,formula,startDate,dueDate:document.getElementById('f_duedate').value||null,operator:document.getElementById('f_operator').value.trim(),tags:document.getElementById('f_tags').value.trim().split(/\s+/).filter(Boolean),note:document.getElementById('f_note').value.trim(),status:'growing_normal',closedDate:null,updates:[],photos:pendingPhotosAdd.slice(),subnum,parentId};
     await DB.saveCulture(newC);
     pendingPhotosAdd=[];
     showToast('บันทึก Culture '+id+' สำเร็จ');
@@ -1819,6 +1940,8 @@ async function saveCulture(){
 }
 
 async function deleteCulture(id){
+  const c=DB.allCultures().find(x=>x.id===id);
+  if(!can('deleteCultures')||!canEditItem(c,'cultures')){showToast('บัญชีนี้ไม่มีสิทธิ์ลบ Culture นี้');return;}
   if(!confirm('ลบ Culture '+id+' ใช่ไหม?'))return;
   await DB.deleteCultureById(id);
   showToast('ลบแล้ว');
@@ -2068,11 +2191,29 @@ function renderUserManagement(){
     } else {
       actions=`<span style="font-size:10px;color:var(--text3);padding:4px">ปกป้อง</span>`;
     }
-    return `<div class="user-item">
+    return `<div class="user-item" style="flex-wrap:wrap">
       <div class="user-avatar" style="background:var(--accent-light);color:var(--accent-text)">${u.avatar||u.name[0]}</div>
-      <div style="flex:1"><div class="user-name">${u.name}${isSA?` <span style="font-size:9px;background:var(--info-light);color:var(--info-text);padding:1px 5px;border-radius:4px;margin-left:4px">ผู้ดูแลหลัก</span>`:''}
-      </div><div style="font-size:11px;color:var(--text3)">${u.email}</div>
-      <span class="user-role ${roleClass}">${roleLabel}</span></div>
+      <div style="flex:1;min-width:0">
+        <div class="user-name">${u.name}${isSA?` <span style="font-size:9px;background:var(--info-light);color:var(--info-text);padding:1px 5px;border-radius:4px;margin-left:4px">ผู้ดูแลหลัก</span>`:''}
+        </div>
+        <div style="font-size:11px;color:var(--text3)">${u.email}</div>
+        <span class="user-role ${roleClass}">${roleLabel}</span>
+        ${(!isSA&&u.role!=='admin')?`
+        <div style="margin-top:8px;padding-top:8px;border-top:1px solid var(--border)">
+          <div style="font-size:10px;font-weight:600;color:var(--text3);margin-bottom:4px;letter-spacing:.4px">🔐 สิทธิ์การใช้งาน</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:0">
+            ${permissionCheckbox(u,'viewAllCultures','เห็นข้อมูลทุกคน')}
+            ${permissionCheckbox(u,'addCultures','เพิ่ม Culture')}
+            ${permissionCheckbox(u,'editCultures','แก้ไข Culture')}
+            ${permissionCheckbox(u,'deleteCultures','ลบ Culture')}
+            ${permissionCheckbox(u,'managePlants','จัดการชนิดพืช')}
+            ${permissionCheckbox(u,'manageFormulas','จัดการสูตรอาหาร')}
+            ${permissionCheckbox(u,'viewNotes','ดูบันทึก')}
+            ${permissionCheckbox(u,'editNotes','เพิ่ม/แก้บันทึก')}
+            ${permissionCheckbox(u,'manageLabTools','จัดการแล็บ')}
+          </div>
+        </div>`:''}
+      </div>
       ${actions}
     </div>`;
   }).join('');
@@ -2151,14 +2292,13 @@ function renderFormulaList(){
   </div>`).join(''):'<div style="font-size:12px;color:var(--text3);padding:8px 0">ยังไม่มีสูตรอาหาร</div>';
 }
 
-function addFormula(){
+async function addFormula(){
+  if(!can('manageFormulas')){showToast('บัญชีนี้ไม่มีสิทธิ์จัดการสูตรอาหาร');return;}
   const name=document.getElementById('newFormulaName').value.trim();
   const desc=document.getElementById('newFormulaDesc').value.trim();
   if(!name){showToast('กรุณากรอกชื่อสูตร');return;}
-  const formulas=DB.formulas();
-  if(formulas.find(f=>f.name===name)){showToast('ชื่อสูตรซ้ำ');return;}
-  formulas.push({id:'f'+Date.now(),name,desc});
-  DB.saveFormulas(formulas);
+  if(DB.formulas().find(f=>(f.name||'').toLowerCase()===name.toLowerCase())){showToast('ชื่อสูตรซ้ำ');return;}
+  await DB.saveFormula({id:'f'+Date.now(),name,desc,updatedAt:Date.now()});
   document.getElementById('newFormulaName').value='';
   document.getElementById('newFormulaDesc').value='';
   renderFormulaList();
@@ -2166,10 +2306,12 @@ function addFormula(){
   showToast('เพิ่มสูตร '+name+' แล้ว');
 }
 
-function deleteFormula(id){
+async function deleteFormula(id){
+  if(!can('manageFormulas')){showToast('บัญชีนี้ไม่มีสิทธิ์จัดการสูตรอาหาร');return;}
   if(!confirm('ลบสูตรนี้ใช่ไหม?'))return;
-  DB.saveFormulas(DB.formulas().filter(f=>f.id!==id));
+  await DB.deleteFormulaById(id);
   renderFormulaList();populateFormulaSelect();
+  showToast('ลบสูตรแล้ว');
 }
 
 // Plant management
@@ -2187,6 +2329,7 @@ function renderPlantList(){
 }
 
 async function addPlant(){
+  if(!can('managePlants')){showToast('บัญชีนี้ไม่มีสิทธิ์จัดการชนิดพืช');return;}
   const name=document.getElementById('newPlantName').value.trim();
   if(!name){showToast('กรุณากรอกชื่อพืช');return;}
   if(DB.plants().find(p=>p.name===name)){showToast('ชื่อพืชซ้ำ');return;}
@@ -2198,6 +2341,7 @@ async function addPlant(){
 }
 
 async function editPlant(id){
+  if(!can('managePlants')){showToast('บัญชีนี้ไม่มีสิทธิ์จัดการชนิดพืช');return;}
   const p=DB.plants().find(x=>x.id===id);
   if(!p)return;
   const newName=prompt('แก้ไขชื่อพืช:',p.name);
@@ -2208,6 +2352,7 @@ async function editPlant(id){
 }
 
 async function deletePlant(id){
+  if(!can('managePlants')){showToast('บัญชีนี้ไม่มีสิทธิ์จัดการชนิดพืช');return;}
   if(!confirm('ลบชนิดพืชนี้ใช่ไหม?'))return;
   await DB.deletePlantById(id);
   renderPlantList();populateFormulaSelect();
@@ -2224,27 +2369,32 @@ function renderNotesList(){
       <div style="flex:1;min-width:0">
         <div style="font-size:14px;font-weight:600;color:var(--text);margin-bottom:4px">${(n.title||'ไม่มีชื่อ').replace(/</g,'&lt;')}</div>
         <div style="font-size:12px;color:var(--text2);white-space:pre-wrap;line-height:1.5;max-height:60px;overflow:hidden">${(n.content||'').replace(/</g,'&lt;').substring(0,200)}</div>
-        <div style="font-size:10px;color:var(--text3);margin-top:6px">${n.updatedAt?formatDateTime(new Date(n.updatedAt).toISOString().slice(0,16)):''}</div>
+        <div style="font-size:10px;color:var(--text3);margin-top:6px">${n.ownerName?'โดย '+n.ownerName+' · ':''} ${n.updatedAt?formatDateTime(new Date(n.updatedAt).toISOString().slice(0,16)):''}</div>
       </div>
-      <button onclick="event.stopPropagation();deleteNote('${n.id}')" style="color:var(--danger);font-size:11px;padding:4px 8px;background:var(--danger-light);border:none;border-radius:6px;cursor:pointer;flex-shrink:0">ลบ</button>
+      ${canEditItem(n,'notes')?`<button onclick="event.stopPropagation();deleteNote('${n.id}')" style="color:var(--danger);font-size:11px;padding:4px 8px;background:var(--danger-light);border:none;border-radius:6px;cursor:pointer;flex-shrink:0">ลบ</button>`:''}
     </div>
   </div>`).join(''):'<div style="font-size:12px;color:var(--text3);padding:8px 0">ยังไม่มีบันทึก</div>';
 }
 
 let currentNoteId=null;
 function openNoteModal(id){
+  if(id&&!canEditItem(DB.allNotes().find(n=>n.id===id),'notes')){showToast('บัญชีนี้ไม่มีสิทธิ์แก้ไขบันทึกนี้');return;}
+  if(!id&&!can('editNotes')){showToast('บัญชีนี้ไม่มีสิทธิ์เพิ่มบันทึก');return;}
   currentNoteId=id||null;
-  const note=id?DB.notes().find(n=>n.id===id):null;
+  const note=id?DB.allNotes().find(n=>n.id===id):null;
   document.getElementById('noteTitle').value=note?note.title||'':'';
   document.getElementById('noteContent').value=note?note.content||'':'';
   document.getElementById('noteModal').classList.remove('hidden');
 }
 
 async function saveNote(){
+  if(!can('editNotes')){showToast('บัญชีนี้ไม่มีสิทธิ์เพิ่ม/แก้บันทึก');return;}
   const title=document.getElementById('noteTitle').value.trim();
   const content=document.getElementById('noteContent').value.trim();
   if(!title&&!content){showToast('กรุณากรอกข้อมูล');return;}
-  const n={id:currentNoteId||'n'+Date.now(),title,content,updatedAt:Date.now()};
+  // คงค่า ownerId เดิมถ้าเป็นการแก้ไข
+  const old=currentNoteId?DB.allNotes().find(n=>n.id===currentNoteId):null;
+  const n={id:currentNoteId||'n'+Date.now(),ownerId:old?.ownerId||currentUser?.id||'',ownerName:old?.ownerName||currentUser?.name||'',title,content,updatedAt:Date.now()};
   await DB.saveNote(n);
   closeModal('noteModal');
   renderNotesList();
@@ -2252,6 +2402,8 @@ async function saveNote(){
 }
 
 async function deleteNote(id){
+  const n=DB.allNotes().find(x=>x.id===id);
+  if(!canEditItem(n,'notes')){showToast('บัญชีนี้ไม่มีสิทธิ์ลบบันทึกนี้');return;}
   if(!confirm('ลบบันทึกนี้ใช่ไหม?'))return;
   await DB.deleteNoteById(id);
   renderNotesList();
@@ -2392,7 +2544,7 @@ function generatePDFReport(){
 <div class="footer">
   รายงานนี้สร้างอัตโนมัติจากระบบ Tissue Me Chua Lab — ${new Date().toLocaleString('th-TH')} — ข้อมูลสงวนลิขสิทธิ์
 </div>
-<script>window.onload=function(){window.print();}</script>
+<${'script'}>window.onload=function(){window.print();}</${'script'}>
 </body></html>`;
 
   const blob = new Blob([html], {type:'text/html;charset=utf-8'});
@@ -2709,10 +2861,19 @@ function showToast(msg){const t=document.getElementById('toast');t.textContent=m
 
 // Init
 window.onFbReady=function(){
-  const btn=document.getElementById('loginBtn');
-  const status=document.getElementById('loginStatus');
-  if(btn){btn.disabled=false;btn.style.opacity='1';}
-  if(status)status.style.display='none';
+  // Enable login button (may be called before or after DOMContentLoaded)
+  function enableLoginBtn(){
+    const btn=document.getElementById('loginBtn');
+    const status=document.getElementById('loginStatus');
+    if(btn){btn.disabled=false;btn.style.opacity='1';}
+    if(status)status.style.display='none';
+  }
+  // If DOM ready, enable immediately; else wait
+  if(document.readyState==='loading'){
+    document.addEventListener('DOMContentLoaded', enableLoginBtn);
+  } else {
+    enableLoginBtn();
+  }
 
   const{db,collection,getDocs,doc,setDoc}=FS;
   getDocs(collection(db,'users')).then(snap=>{
@@ -2729,12 +2890,20 @@ window.onFbReady=function(){
           const user=DB._users.find(u=>u.id===sess.id&&(u.email||'').toLowerCase()===sess.email.toLowerCase());
           if(user&&user.approved){
             currentUser=user;
-            document.getElementById('login-page').classList.add('hidden');
-            document.getElementById('app').classList.remove('hidden');
-            document.getElementById('userAvatar').textContent=user.avatar||user.name[0];
-            document.getElementById('mainFab').classList.remove('hidden');
-            initApp();
-            setupRealtimeSync();
+            // Wait for DOM if needed
+            function startApp(){
+              document.getElementById('login-page').classList.add('hidden');
+              document.getElementById('app').classList.remove('hidden');
+              document.getElementById('userAvatar').textContent=user.avatar||user.name[0];
+              document.getElementById('mainFab').classList.remove('hidden');
+              initApp();
+              setupRealtimeSync();
+            }
+            if(document.readyState==='loading'){
+              document.addEventListener('DOMContentLoaded', startApp);
+            } else {
+              startApp();
+            }
             return;
           }
         } else {
@@ -2746,26 +2915,57 @@ window.onFbReady=function(){
 };
 
 window.addEventListener('DOMContentLoaded',()=>{
-  // Disable button while waiting for Firebase
   const btn=document.getElementById('loginBtn');
   const status=document.getElementById('loginStatus');
+  // Only disable if Firebase truly not ready yet
   if(!window._fbReady){
     if(btn){btn.disabled=true;btn.style.opacity='0.6';}
     if(status){status.style.display='block';document.getElementById('loginStatusText').textContent='⏳ กำลังเชื่อมต่อ...';}
+    // Safety: auto-enable after 15 sec regardless
+    setTimeout(()=>{
+      if(btn&&btn.disabled){
+        btn.disabled=false;btn.style.opacity='1';
+        if(status)status.style.display='none';
+      }
+    },15000);
   } else {
-    // Firebase already ready (unlikely but handle it)
-    window.onFbReady();
+    // Firebase already ready — make sure button is enabled
+    if(btn){btn.disabled=false;btn.style.opacity='1';}
+    if(status)status.style.display='none';
   }
 });
 
 // Realtime sync — listens to Firestore changes and updates UI live
-let _unsubCultures=null,_unsubTemps=null,_unsubUsers=null,_unsubSchedule=null,_unsubInventory=null,_unsubProtocols=null;
+let _unsubCultures=null,_unsubTemps=null,_unsubUsers=null,_unsubFormulas=null,_unsubPlants=null,_unsubNotes=null,_unsubSchedule=null,_unsubInventory=null,_unsubProtocols=null;
 function setupRealtimeSync(){
   const{db,collection,onSnapshot}=FS;
-  [_unsubCultures,_unsubTemps,_unsubUsers,_unsubSchedule,_unsubInventory,_unsubProtocols].forEach(u=>{try{if(u)u();}catch(e){}});
+  [_unsubCultures,_unsubTemps,_unsubUsers,_unsubFormulas,_unsubPlants,_unsubNotes,_unsubSchedule,_unsubInventory,_unsubProtocols].forEach(u=>{try{if(u)u();}catch(e){}});
+
   _unsubCultures=onSnapshot(collection(db,'cultures'),snap=>{DB._cultures=snap.docs.map(d=>d.data());refreshCurrentPage();});
   _unsubTemps=onSnapshot(collection(db,'temps'),snap=>{DB._temps=snap.docs.map(d=>d.data()).sort((a,b)=>a.datetime.localeCompare(b.datetime));if(currentPage==='lab'||currentPage==='dashboard')refreshCurrentPage();});
-  _unsubUsers=onSnapshot(collection(db,'users'),snap=>{DB._users=snap.docs.map(d=>d.data());if(currentPage==='settings')renderSettings();});
+  _unsubUsers=onSnapshot(collection(db,'users'),snap=>{
+    DB._users=snap.docs.map(d=>d.data());
+    // อัพเดต permissions ของ currentUser แบบ realtime
+    if(currentUser){const fresh=DB._users.find(u=>u.id===currentUser.id);if(fresh)currentUser=fresh;}
+    applyPermissionUI();
+    if(currentPage==='settings')renderSettings();
+    else refreshCurrentPage();
+  });
+  // ✅ Formulas, Plants, Notes — sync ผ่าน Firestore realtime
+  _unsubFormulas=onSnapshot(collection(db,'formulas'),snap=>{
+    DB._formulas=snap.docs.map(d=>d.data());
+    populateFormulaSelect();
+    if(currentPage==='settings')renderFormulaList();
+  });
+  _unsubPlants=onSnapshot(collection(db,'plants'),snap=>{
+    DB._plants=snap.docs.map(d=>d.data());
+    populateFormulaSelect();
+    if(currentPage==='settings')renderPlantList();
+  });
+  _unsubNotes=onSnapshot(collection(db,'notes'),snap=>{
+    DB._notes=snap.docs.map(d=>d.data());
+    if(currentPage==='settings')renderNotesList();
+  });
   _unsubSchedule=onSnapshot(collection(db,'schedule'),snap=>{DB._schedule=snap.docs.map(d=>d.data());if(currentPage==='lab')renderSchedule();});
   _unsubInventory=onSnapshot(collection(db,'inventory'),snap=>{DB._inventory=snap.docs.map(d=>d.data());if(currentPage==='lab')renderInventory();});
   _unsubProtocols=onSnapshot(collection(db,'protocols'),snap=>{DB._protocols=snap.docs.map(d=>d.data());if(currentPage==='lab')renderProtocols();});
