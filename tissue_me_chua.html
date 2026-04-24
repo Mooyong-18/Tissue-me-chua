@@ -27,7 +27,8 @@ const fbApp=initializeApp(firebaseConfig);
 const db=getFirestore(fbApp);
 window.FS={db,collection,doc,getDoc,getDocs,setDoc,updateDoc,deleteDoc,onSnapshot,query,orderBy,serverTimestamp};
 window._fbReady=true;
-window.dispatchEvent(new Event('fbReady'));
+// module scripts run after DOM — call onFbReady directly
+if(typeof window.onFbReady==='function')window.onFbReady();
 </script>
 <style>
 :root{
@@ -282,7 +283,10 @@ textarea.inp{resize:vertical;min-height:72px}
         </div>
       </div>
       <div id="loginError" style="color:var(--danger);font-size:12px;margin-bottom:10px;display:none"></div>
-      <button class="btn btn-primary" onclick="doLogin()">เข้าสู่ระบบ</button>
+      <div id="loginStatus" style="color:var(--text3);font-size:12px;margin-bottom:10px;display:none;text-align:center">
+        <span id="loginStatusText">กำลังเชื่อมต่อ Firebase...</span>
+      </div>
+      <button class="btn btn-primary" id="loginBtn" onclick="doLogin()">เข้าสู่ระบบ</button>
     </div>
     <div id="registerForm" class="hidden">
       <div class="form-group">
@@ -883,18 +887,38 @@ function doLogin(){
   const email=document.getElementById('loginEmail').value.trim();
   const pass=document.getElementById('loginPass').value;
   const err=document.getElementById('loginError');
+  const status=document.getElementById('loginStatus');
+  const btn=document.getElementById('loginBtn');
   if(!email||!pass){err.textContent='กรุณากรอกอีเมลและรหัสผ่าน';err.style.display='block';return;}
+  err.style.display='none';
 
-  // If users not loaded yet, load from Firebase first
+  // If FS not ready yet, wait
+  if(!window.FS){
+    status.style.display='block';
+    document.getElementById('loginStatusText').textContent='⏳ รอ Firebase พร้อม...';
+    btn.disabled=true;btn.style.opacity='0.6';
+    let t=0;
+    const iv=setInterval(()=>{
+      t+=500;
+      if(window.FS){clearInterval(iv);btn.disabled=false;btn.style.opacity='1';status.style.display='none';doLogin();}
+      else if(t>20000){clearInterval(iv);btn.disabled=false;btn.style.opacity='1';status.style.display='none';err.textContent='Firebase โหลดช้า กรุณา Refresh';err.style.display='block';}
+    },500);
+    return;
+  }
+
+  // Load users if needed
   if(DB._users.length===0){
-    err.textContent='';err.style.display='none';
-    showToast('กำลังตรวจสอบ...');
+    status.style.display='block';
+    document.getElementById('loginStatusText').textContent='⏳ โหลดข้อมูลผู้ใช้...';
+    btn.disabled=true;btn.style.opacity='0.6';
     const{db,collection,getDocs}=FS;
     getDocs(collection(db,'users')).then(snap=>{
       DB._users=snap.docs.map(d=>d.data());
+      btn.disabled=false;btn.style.opacity='1';status.style.display='none';
       _doLoginCheck(email,pass,err);
-    }).catch(e=>{
-      err.textContent='ไม่สามารถเชื่อมต่อได้ กรุณาลองใหม่';err.style.display='block';
+    }).catch(()=>{
+      btn.disabled=false;btn.style.opacity='1';status.style.display='none';
+      err.textContent='โหลดข้อมูลไม่ได้ กรุณาลองใหม่';err.style.display='block';
     });
     return;
   }
@@ -1845,44 +1869,54 @@ function formatRelDate(s){if(!s)return '';const diff=(Date.now()-new Date(s))/10
 function showToast(msg){const t=document.getElementById('toast');t.textContent=msg;t.style.opacity='1';setTimeout(()=>t.style.opacity='0',2500);}
 
 // Init
-window.addEventListener('DOMContentLoaded',()=>{
-  // Wait for Firebase module to be ready
-  function onFbReady(){
-    // Pre-load users for login check (lightweight)
-    const{db,collection,getDocs,onSnapshot,doc,setDoc}=FS;
-    getDocs(collection(db,'users')).then(snap=>{
-      DB._users=snap.docs.map(d=>d.data());
-      // Ensure superadmin exists
-      if(!DB._users.find(u=>u.superadmin)){
-        const sa={id:'SUPERADMIN',name:'สาธิต ฉัตรพันธุ์',email:'Satit.c@psru.ac.th',pass:'254102',role:'admin',approved:true,avatar:'ส',superadmin:true};
-        setDoc(doc(db,'users','SUPERADMIN'),sa).then(()=>{DB._users.push(sa);});
-      }
-      // Auto-login from saved session
-      try{
-        const sess=JSON.parse(localStorage.getItem('tmc_session')||'null');
-        if(sess&&sess.id){
-          // Session expires after 30 days
-          if(Date.now()-sess.time<30*86400000){
-            const user=DB._users.find(u=>u.id===sess.id&&u.email===sess.email);
-            if(user&&user.approved){
-              currentUser=user;
-              document.getElementById('login-page').classList.add('hidden');
-              document.getElementById('app').classList.remove('hidden');
-              document.getElementById('userAvatar').textContent=user.avatar||user.name[0];
-              document.getElementById('mainFab').classList.remove('hidden');
-              initApp();
-              setupRealtimeSync();
-              return;
-            }
-          } else {
-            localStorage.removeItem('tmc_session');
+window.onFbReady=function(){
+  const btn=document.getElementById('loginBtn');
+  const status=document.getElementById('loginStatus');
+  if(btn){btn.disabled=false;btn.style.opacity='1';}
+  if(status)status.style.display='none';
+
+  const{db,collection,getDocs,doc,setDoc}=FS;
+  getDocs(collection(db,'users')).then(snap=>{
+    DB._users=snap.docs.map(d=>d.data());
+    if(!DB._users.find(u=>u.superadmin)){
+      const sa={id:'SUPERADMIN',name:'สาธิต ฉัตรพันธุ์',email:'Satit.c@psru.ac.th',pass:'254102',role:'admin',approved:true,avatar:'ส',superadmin:true};
+      setDoc(doc(db,'users','SUPERADMIN'),sa).then(()=>{DB._users.push(sa);});
+    }
+    // Auto-login from saved session
+    try{
+      const sess=JSON.parse(localStorage.getItem('tmc_session')||'null');
+      if(sess&&sess.id){
+        if(Date.now()-sess.time<30*86400000){
+          const user=DB._users.find(u=>u.id===sess.id&&(u.email||'').toLowerCase()===sess.email.toLowerCase());
+          if(user&&user.approved){
+            currentUser=user;
+            document.getElementById('login-page').classList.add('hidden');
+            document.getElementById('app').classList.remove('hidden');
+            document.getElementById('userAvatar').textContent=user.avatar||user.name[0];
+            document.getElementById('mainFab').classList.remove('hidden');
+            initApp();
+            setupRealtimeSync();
+            return;
           }
+        } else {
+          localStorage.removeItem('tmc_session');
         }
-      }catch(e){console.warn('session restore failed',e);}
-    });
+      }
+    }catch(e){console.warn('session restore failed',e);}
+  }).catch(e=>console.error('load users failed',e));
+};
+
+window.addEventListener('DOMContentLoaded',()=>{
+  // Disable button while waiting for Firebase
+  const btn=document.getElementById('loginBtn');
+  const status=document.getElementById('loginStatus');
+  if(!window._fbReady){
+    if(btn){btn.disabled=true;btn.style.opacity='0.6';}
+    if(status){status.style.display='block';document.getElementById('loginStatusText').textContent='⏳ กำลังเชื่อมต่อ...';}
+  } else {
+    // Firebase already ready (unlikely but handle it)
+    window.onFbReady();
   }
-  if(window._fbReady)onFbReady();
-  else window.addEventListener('fbReady',onFbReady);
 });
 
 // Realtime sync — listens to Firestore changes and updates UI live
