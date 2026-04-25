@@ -669,19 +669,6 @@ textarea.inp{resize:vertical;min-height:72px}
               <svg width="16" height="16" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M4 4h8l4 4v10H4V4z" stroke-linejoin="round"/><path d="M12 4v4h4M7 12h6M7 15h4" stroke-linecap="round"/></svg>
               Export JSON (สำรองข้อมูลทั้งหมด)
             </button>
-            <div id="autoBackupStatus" style="font-size:11px;color:var(--text3);line-height:1.5;margin:-2px 0 2px 2px">Auto Backup: กำลังตรวจสอบ...</div>
-            <button class="btn btn-outline" onclick="manualAutoBackup()" style="justify-content:flex-start;gap:10px">
-              <svg width="16" height="16" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M10 3v10" stroke-linecap="round"/><path d="M6 9l4 4 4-4" stroke-linecap="round" stroke-linejoin="round"/><path d="M4 16h12" stroke-linecap="round"/></svg>
-              Backup ตอนนี้ (บันทึกไว้ในเครื่อง)
-            </button>
-            <button class="btn btn-outline" onclick="downloadLatestAutoBackup()" style="justify-content:flex-start;gap:10px">
-              <svg width="16" height="16" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M5 3h10v14H5z" stroke-linejoin="round"/><path d="M8 7h4M8 10h4M8 13h3" stroke-linecap="round"/></svg>
-              ดาวน์โหลด Backup ล่าสุด
-            </button>
-            <button class="btn btn-outline" onclick="document.getElementById('restoreBackupInput').click()" style="justify-content:flex-start;gap:10px;color:var(--warn);border-color:#fcd34d">
-              <svg width="16" height="16" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M10 17V7" stroke-linecap="round"/><path d="M6 11l4-4 4 4" stroke-linecap="round" stroke-linejoin="round"/><path d="M4 4h12" stroke-linecap="round"/></svg>
-              Restore จากไฟล์ Backup
-            </button>
             <button class="btn btn-outline" onclick="exportCSV()" style="justify-content:flex-start;gap:10px">
               <svg width="16" height="16" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.7"><rect x="3" y="3" width="14" height="14" rx="2"/><path d="M3 7h14M3 11h14M7 7v10" stroke-linecap="round"/></svg>
               Export CSV (เปิดใน Excel/Google Sheets)
@@ -919,7 +906,6 @@ textarea.inp{resize:vertical;min-height:72px}
 
 <!-- TOAST -->
 <div id="toast" style="position:fixed;bottom:90px;left:50%;transform:translateX(-50%);background:var(--text);color:var(--bg);padding:10px 20px;border-radius:var(--radius-sm);font-size:13px;z-index:999;opacity:0;transition:opacity .3s;pointer-events:none;white-space:nowrap"></div>
-<input type="file" id="restoreBackupInput" accept="application/json" class="hidden" onchange="restoreBackupFromFile(event)">
 
 <!-- FAB -->
 <button class="fab hidden" id="mainFab" onclick="showPage('add')">
@@ -1394,7 +1380,6 @@ async function initApp(){
   setDefaultDates();
   showPage('dashboard');
   renderSettings();
-  initAutoBackup();
 }
 
 function setDefaultDates(){
@@ -2424,7 +2409,6 @@ function renderSettings(){
   renderNotesList();
   const noteBtn=document.querySelector('button[onclick="openNoteModal()"]');
   if(noteBtn)noteBtn.style.display=can('editNotes')?'block':'none';
-  updateAutoBackupStatus();
 }
 
 function renderUserManagement(){
@@ -2716,170 +2700,6 @@ function exportJSON(){
   downloadFile(`TissueMeChua_backup_${date}.json`, JSON.stringify(data, null, 2), 'application/json');
   showToast('Export JSON สำเร็จ');
 }
-
-
-// ──────────────────────────────────────────────
-// AUTO BACKUP (LOCAL JSON SNAPSHOT)
-// ──────────────────────────────────────────────
-const AUTO_BACKUP_KEY='tmc_auto_backup_latest_v2';
-const AUTO_BACKUP_HISTORY_KEY='tmc_auto_backup_history_v2';
-const AUTO_BACKUP_LAST_RUN_KEY='tmc_auto_backup_last_run_v2';
-const AUTO_BACKUP_INTERVAL_MS=24*60*60*1000;
-
-function cloneNoPhotos(obj){
-  const data=JSON.parse(JSON.stringify(obj||{}));
-  if(Array.isArray(data.cultures)){
-    data.cultures.forEach(c=>{
-      c.photos=(c.photos||[]).map(p=>({date:p.date||'',note:p.note||'',removed:true}));
-      (c.updates||[]).forEach(u=>{
-        u.photos=(u.photos||[]).map(p=>({date:p.date||'',note:p.note||'',removed:true}));
-      });
-    });
-  }
-  return data;
-}
-
-function buildBackupData(){
-  const raw={
-    app:'Tissue Me Chua',
-    type:'auto-backup',
-    version:2,
-    exportDate:new Date().toISOString(),
-    exportBy:currentUser?{id:currentUser.id,name:currentUser.name,email:currentUser.email,role:currentUser.role}:null,
-    collections:{
-      cultures:typeof DB!=='undefined'?(DB.allCultures?DB.allCultures():DB.cultures()):[],
-      temps:typeof DB!=='undefined'?DB.temps():[],
-      users:typeof DB!=='undefined'?DB.users():[],
-      formulas:typeof DB!=='undefined'?DB.formulas():[],
-      plants:typeof DB!=='undefined'?DB.plants():[],
-      notes:typeof DB!=='undefined'?(DB.allNotes?DB.allNotes():DB.notes()):[],
-      batches:typeof DB!=='undefined'?DB.batches():[],
-      inventory:typeof DB!=='undefined'?(DB._inventory||[]):[],
-      protocols:typeof DB!=='undefined'?(DB._protocols||[]):[],
-      schedule:typeof DB!=='undefined'?(DB._schedule||[]):[]
-    }
-  };
-  return cloneNoPhotos(raw);
-}
-
-function saveAutoBackup(reason='auto'){
-  try{
-    const data=buildBackupData();
-    data.reason=reason;
-    const json=JSON.stringify(data);
-    localStorage.setItem(AUTO_BACKUP_KEY,json);
-    localStorage.setItem(AUTO_BACKUP_LAST_RUN_KEY,data.exportDate);
-
-    let history=[];
-    try{history=JSON.parse(localStorage.getItem(AUTO_BACKUP_HISTORY_KEY)||'[]')||[];}catch(e){history=[];}
-    history.unshift({
-      date:data.exportDate,
-      reason,
-      size:json.length,
-      counts:Object.fromEntries(Object.entries(data.collections||{}).map(([k,v])=>[k,Array.isArray(v)?v.length:0])),
-      json
-    });
-    history=history.slice(0,5);
-    localStorage.setItem(AUTO_BACKUP_HISTORY_KEY,JSON.stringify(history));
-    updateAutoBackupStatus();
-    return data;
-  }catch(e){
-    console.error('Auto backup failed:',e);
-    showToast('Auto Backup ไม่สำเร็จ');
-    return null;
-  }
-}
-
-function shouldRunAutoBackup(){
-  const last=localStorage.getItem(AUTO_BACKUP_LAST_RUN_KEY);
-  if(!last)return true;
-  return Date.now()-new Date(last).getTime()>=AUTO_BACKUP_INTERVAL_MS;
-}
-
-function initAutoBackup(){
-  if(window.__autoBackupReady)return;
-  window.__autoBackupReady=true;
-  setTimeout(()=>{
-    if(shouldRunAutoBackup())saveAutoBackup('daily');
-    else updateAutoBackupStatus();
-  },1200);
-
-  setInterval(()=>{
-    if(shouldRunAutoBackup())saveAutoBackup('daily-interval');
-  },60*60*1000);
-
-  document.addEventListener('visibilitychange',()=>{
-    if(!document.hidden&&shouldRunAutoBackup())saveAutoBackup('daily-visible');
-  });
-}
-
-function manualAutoBackup(){
-  const data=saveAutoBackup('manual');
-  if(data)showToast('Backup แล้ว');
-}
-
-function downloadLatestAutoBackup(){
-  let json=localStorage.getItem(AUTO_BACKUP_KEY);
-  if(!json){
-    const data=saveAutoBackup('manual-download');
-    if(!data)return;
-    json=JSON.stringify(data,null,2);
-  }else{
-    try{json=JSON.stringify(JSON.parse(json),null,2);}catch(e){}
-  }
-  const date=new Date().toISOString().slice(0,10);
-  downloadFile(`TissueMeChua_auto_backup_${date}.json`,json,'application/json');
-  showToast('ดาวน์โหลด Backup แล้ว');
-}
-
-function updateAutoBackupStatus(){
-  const el=document.getElementById('autoBackupStatus');
-  if(!el)return;
-  const last=localStorage.getItem(AUTO_BACKUP_LAST_RUN_KEY);
-  if(!last){
-    el.textContent='Auto Backup: ยังไม่มี backup ในเครื่องนี้';
-    return;
-  }
-  const d=new Date(last);
-  const size=(localStorage.getItem(AUTO_BACKUP_KEY)||'').length;
-  el.textContent=`Auto Backup ล่าสุด: ${d.toLocaleString('th-TH')} · ${(size/1024).toFixed(1)} KB`;
-}
-
-async function restoreBackupFromFile(event){
-  const file=event.target.files&&event.target.files[0];
-  event.target.value='';
-  if(!file)return;
-  if(!confirm('Restore จะเขียนข้อมูลจากไฟล์กลับเข้า Firestore และอาจทับข้อมูล ID เดิม ต้องการทำต่อไหม?'))return;
-
-  try{
-    const text=await file.text();
-    const backup=JSON.parse(text);
-    const collections=backup.collections||backup;
-    const allowed=['cultures','temps','users','formulas','plants','notes','batches','inventory','protocols','schedule'];
-    const {db,doc,setDoc}=FS;
-    let count=0;
-
-    for(const name of allowed){
-      const rows=collections[name];
-      if(!Array.isArray(rows))continue;
-      for(const item of rows){
-        if(!item||typeof item!=='object')continue;
-        const id=item.id||item.code||(`${name}_${Date.now()}_${Math.random().toString(36).slice(2,8)}`);
-        await setDoc(doc(db,name,id),{...item,id});
-        count++;
-      }
-    }
-
-    await DB.loadAll();
-    refreshCurrentPage();
-    saveAutoBackup('after-restore');
-    showToast(`Restore สำเร็จ ${count} รายการ`);
-  }catch(e){
-    console.error('Restore failed:',e);
-    alert('Restore ไม่สำเร็จ: ไฟล์อาจไม่ถูกต้อง หรือเชื่อมต่อ Firebase ไม่ได้');
-  }
-}
-
 
 function exportCSV(){
   const cultures = DB.cultures();
@@ -3436,6 +3256,329 @@ function refreshCurrentPage(){
   setTimeout(()=>{ensureNotificationCenter();renderNotificationCenter();},1000);
 })();
 </script>
+
+<script>
+/* EXPERIMENT MODE FULL PATCH: เพิ่มโหมดการทดลองแบบเต็ม โดยคง UI เดิม */
+(function(){
+  if(window.__experimentModeFullPatch)return; window.__experimentModeFullPatch=true;
+
+  const EXP_COL='experiments';
+  const RES_COL='experiment_results';
+  let currentExperimentId=null;
+  let expChart=null;
+  window._experiments=window._experiments||[];
+  window._experimentResults=window._experimentResults||[];
+
+  function esc(s){return String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
+  function today(){return new Date().toISOString().slice(0,10)}
+  function uid(prefix){return prefix+Date.now().toString(36)+Math.random().toString(36).slice(2,7)}
+  function formulas(){try{return typeof DB?.formulas==='function'?DB.formulas():[]}catch(e){return []}}
+  function cultures(){try{return typeof DB?.cultures==='function'?DB.cultures():[]}catch(e){return []}}
+  function usersCurrent(){try{return currentUser||null}catch(e){return null}}
+  function show(msg){try{typeof showToast==='function'?showToast(msg):alert(msg)}catch(e){alert(msg)}}
+  function fmt(d){try{return typeof formatDate==='function'?formatDate(d):String(d||'')}catch(e){return String(d||'')}}
+  function avg(arr){const nums=arr.map(Number).filter(n=>!isNaN(n));return nums.length?nums.reduce((a,b)=>a+b,0)/nums.length:0}
+
+  function ensureExperimentStyle(){
+    if(document.getElementById('experimentModeStyle'))return;
+    document.head.insertAdjacentHTML('beforeend',`<style id="experimentModeStyle">
+      .exp-list-card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:13px;box-shadow:var(--shadow);margin-bottom:8px;cursor:pointer}
+      .exp-list-card.active{border-color:var(--accent);box-shadow:0 0 0 2px rgba(45,106,79,.12)}
+      .exp-title{font-size:14px;font-weight:700;color:var(--text)}
+      .exp-meta{font-size:11px;color:var(--text3);margin-top:2px;line-height:1.45}
+      .exp-kpi-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px}
+      .exp-kpi{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:12px;box-shadow:var(--shadow)}
+      .exp-kpi b{font-size:20px;color:var(--text);display:block;line-height:1}
+      .exp-kpi span{font-size:10px;color:var(--text3);display:block;margin-top:5px}
+      .exp-pill{display:inline-flex;align-items:center;gap:4px;padding:3px 8px;border-radius:99px;background:var(--bg2);font-size:10px;color:var(--text2);margin:2px 4px 2px 0}
+      .exp-result-row{background:var(--card);border:1px solid var(--border);border-radius:var(--radius-sm);padding:10px;margin-top:8px}
+      .exp-img-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-top:8px}
+      .exp-thumb{aspect-ratio:1;border-radius:8px;object-fit:cover;border:1px solid var(--border);background:var(--bg2);width:100%}
+      .exp-table{width:100%;border-collapse:collapse;font-size:11px;background:var(--card);border-radius:var(--radius-sm);overflow:hidden}
+      .exp-table th,.exp-table td{border-bottom:1px solid var(--border);padding:7px 6px;text-align:left;vertical-align:top}
+      .exp-table th{color:var(--text3);font-weight:600;background:var(--bg)}
+      .exp-empty{padding:24px 12px;text-align:center;color:var(--text3);font-size:13px}
+      .exp-section-title{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:10px}
+      .exp-section-title .section-label{margin:0}
+      .exp-action-row{display:flex;gap:8px;flex-wrap:wrap}.exp-action-row .btn{width:auto;flex:1;min-width:110px}
+    </style>`);
+  }
+
+  function ensureExperimentUI(){
+    ensureExperimentStyle();
+    const tabs=document.getElementById('labTabs');
+    if(tabs && !document.getElementById('experimentLabTabBtn')){
+      tabs.insertAdjacentHTML('beforeend',`<button id="experimentLabTabBtn" class="tab-btn" onclick="switchLabTab('experiment',this)" style="flex:1;font-size:11px;padding:7px 4px">🧫 ทดลอง</button>`);
+    }
+    const labSection=document.querySelector('#page-lab .section');
+    if(labSection && !document.getElementById('labTab-experiment')){
+      labSection.insertAdjacentHTML('beforeend',experimentTabHtml());
+    }
+    if(!document.getElementById('experimentModal')){
+      document.body.insertAdjacentHTML('beforeend',experimentModalHtml()+resultModalHtml());
+    }
+  }
+
+  function experimentTabHtml(){return `
+    <div id="labTab-experiment" class="hidden">
+      <div class="exp-section-title">
+        <div>
+          <div class="section-label">โหมดการทดลอง</div>
+          <div style="font-size:11px;color:var(--text3);margin-top:2px">สร้างการทดลอง บันทึกผล ใส่รูป และสรุปผลในหน้าเดียว</div>
+        </div>
+        <button class="btn btn-outline btn-sm" onclick="openExperimentModal()">+ เพิ่มการทดลอง</button>
+      </div>
+      <div id="experimentList" style="margin-bottom:14px"></div>
+      <div id="experimentDetail"></div>
+    </div>`}
+
+  function experimentModalHtml(){return `
+    <div class="modal-overlay hidden" id="experimentModal">
+      <div class="modal-sheet">
+        <div class="modal-handle"></div>
+        <div class="modal-header"><div class="modal-title" id="experimentModalTitle">เพิ่มการทดลอง</div><button onclick="closeModal('experimentModal')" style="font-size:22px;color:var(--text3)">×</button></div>
+        <div class="modal-body">
+          <input type="hidden" id="exp_id"/>
+          <div class="form-group"><label class="form-label">1. ชื่อการทดลอง <span class="form-req">*</span></label><input class="inp" id="exp_name" placeholder="เช่น BA vs NAA ในกล้วย"/></div>
+          <div class="form-group"><label class="form-label">2. สูตรอาหารเลี้ยงเชื้อ</label><select class="inp" id="exp_formula"></select></div>
+          <div class="form-group"><label class="form-label">3. ชุดการทดลอง</label><input class="inp" id="exp_groups" placeholder="เช่น A: F1, B: F1+BA, C: F1+NAA"/></div>
+          <div class="form-group"><label class="form-label">4. ขั้นตอนการทดลอง</label><textarea class="inp" id="exp_steps" placeholder="เขียนขั้นตอน เช่น เตรียมอาหาร, ลงเนื้อเยื่อ, ตรวจทุก 7 วัน"></textarea></div>
+          <div class="form-group"><label class="form-label">6. เกณฑ์การประเมิน</label><textarea class="inp" id="exp_criteria" placeholder="เช่น จำนวนยอด, จำนวนราก, ความยาว, contamination, สีใบ"></textarea></div>
+          <div class="form-group"><label class="form-label">7. สรุป</label><textarea class="inp" id="exp_summary" placeholder="สรุปผลการทดลอง / ข้อสังเกต"></textarea></div>
+        </div>
+        <div class="modal-footer"><button class="btn btn-secondary" onclick="closeModal('experimentModal')">ยกเลิก</button><button class="btn btn-primary" onclick="saveExperiment()">บันทึก</button></div>
+      </div>
+    </div>`}
+
+  function resultModalHtml(){return `
+    <div class="modal-overlay hidden" id="experimentResultModal">
+      <div class="modal-sheet">
+        <div class="modal-handle"></div>
+        <div class="modal-header"><div class="modal-title" id="resultModalTitle">เพิ่มผลการทดลอง</div><button onclick="closeModal('experimentResultModal')" style="font-size:22px;color:var(--text3)">×</button></div>
+        <div class="modal-body">
+          <input type="hidden" id="res_id"/>
+          <input type="hidden" id="res_experimentId"/>
+          <div class="form-row">
+            <div class="form-group"><label class="form-label">วันที่</label><input class="inp" id="res_date" type="date"/></div>
+            <div class="form-group"><label class="form-label">Day</label><input class="inp" id="res_day" type="number" placeholder="7"/></div>
+          </div>
+          <div class="form-group"><label class="form-label">ชุดการทดลอง / Group</label><input class="inp" id="res_group" placeholder="A / B / Control"/></div>
+          <div class="form-group"><label class="form-label">Culture ที่เกี่ยวข้อง</label><select class="inp" id="res_cultureId"></select></div>
+          <div class="form-row">
+            <div class="form-group"><label class="form-label">จำนวนยอด</label><input class="inp" id="res_shoots" type="number" step="1"/></div>
+            <div class="form-group"><label class="form-label">จำนวนราก</label><input class="inp" id="res_roots" type="number" step="1"/></div>
+          </div>
+          <div class="form-row">
+            <div class="form-group"><label class="form-label">ความยาว (cm)</label><input class="inp" id="res_length" type="number" step="0.1"/></div>
+            <div class="form-group"><label class="form-label">สถานะ</label><select class="inp" id="res_status"><option value="Normal">Normal</option><option value="Slow">Slow</option><option value="Ready">Ready</option><option value="Contamination">Contamination</option><option value="Dead">Dead</option></select></div>
+          </div>
+          <div class="form-group"><label class="form-label">หมายเหตุ</label><textarea class="inp" id="res_note" placeholder="บันทึกผล / อาการ / ข้อสังเกต"></textarea></div>
+          <div class="form-group"><label class="form-label">รูปภาพผลการทดลอง</label><input class="inp" id="res_photos" type="file" accept="image/*" multiple onchange="previewExperimentPhotos(this)"/><div id="res_photoPreview" class="exp-img-grid"></div></div>
+        </div>
+        <div class="modal-footer"><button class="btn btn-secondary" onclick="closeModal('experimentResultModal')">ยกเลิก</button><button class="btn btn-primary" onclick="saveExperimentResult()">บันทึกผล</button></div>
+      </div>
+    </div>`}
+
+  function populateExperimentFormulaSelect(){
+    const sel=document.getElementById('exp_formula'); if(!sel)return;
+    const fs=formulas();
+    sel.innerHTML='<option value="">ไม่ระบุ</option>'+fs.map(f=>`<option value="${esc(f.name||f.id)}">${esc(f.name||f.id)}</option>`).join('');
+  }
+  function populateResultCultureSelect(){
+    const sel=document.getElementById('res_cultureId'); if(!sel)return;
+    const cs=cultures();
+    sel.innerHTML='<option value="">ไม่ระบุ</option>'+cs.map(c=>`<option value="${esc(c.id)}">${esc(c.id)} — ${esc(c.plant||c.name||'')}</option>`).join('');
+  }
+
+  function setupExperimentRealtime(){
+    if(!window.FS || window.__experimentRealtimeReady)return;
+    window.__experimentRealtimeReady=true;
+    const{db,collection,onSnapshot}=FS;
+    try{
+      onSnapshot(collection(db,EXP_COL),snap=>{window._experiments=snap.docs.map(d=>({id:d.id,...d.data()})); renderExperimentMode(); populateExperimentSelectsInCultureForm();});
+      onSnapshot(collection(db,RES_COL),snap=>{window._experimentResults=snap.docs.map(d=>({id:d.id,...d.data()})); renderExperimentMode();});
+    }catch(e){console.warn('experiment realtime error',e)}
+  }
+
+  function renderExperimentMode(){
+    ensureExperimentUI();
+    const list=document.getElementById('experimentList');
+    const detail=document.getElementById('experimentDetail');
+    if(!list||!detail)return;
+    const exps=(window._experiments||[]).slice().sort((a,b)=>(b.updatedAt||b.createdAt||0)-(a.updatedAt||a.createdAt||0));
+    if(!exps.length){
+      list.innerHTML='<div class="exp-empty">ยังไม่มีการทดลอง กด “+ เพิ่มการทดลอง” เพื่อเริ่มต้น</div>';
+      detail.innerHTML=''; return;
+    }
+    if(!currentExperimentId || !exps.some(e=>e.id===currentExperimentId)) currentExperimentId=exps[0].id;
+    list.innerHTML=exps.map(e=>{
+      const rs=resultsFor(e.id); const groups=[...new Set(rs.map(r=>r.group).filter(Boolean))];
+      return `<div class="exp-list-card ${e.id===currentExperimentId?'active':''}" onclick="selectExperiment('${esc(e.id)}')">
+        <div class="exp-title">🧫 ${esc(e.name||'Untitled Experiment')}</div>
+        <div class="exp-meta">สูตร: ${esc(e.formula||'-')} · ผลบันทึก ${rs.length} รายการ · กลุ่ม ${groups.length||0}</div>
+        <div class="exp-meta">${esc((e.groups||'').slice(0,90))}</div>
+      </div>`;
+    }).join('');
+    renderExperimentDetail(currentExperimentId);
+  }
+
+  function resultsFor(expId){return (window._experimentResults||[]).filter(r=>r.experimentId===expId).sort((a,b)=>(Number(a.day)||0)-(Number(b.day)||0)||String(a.date||'').localeCompare(String(b.date||'')));}
+  function experimentById(id){return (window._experiments||[]).find(e=>e.id===id)}
+
+  function renderExperimentDetail(expId){
+    const detail=document.getElementById('experimentDetail'); if(!detail)return;
+    const e=experimentById(expId); if(!e){detail.innerHTML='';return;}
+    const rs=resultsFor(expId);
+    const groups=[...new Set(rs.map(r=>r.group||'ไม่ระบุ').filter(Boolean))];
+    const contam=rs.filter(r=>String(r.status).toLowerCase().includes('contam')).length;
+    const best=bestGroup(rs);
+    detail.innerHTML=`
+      <div class="exp-kpi-grid">
+        <div class="exp-kpi"><b>${rs.length}</b><span>จำนวนบันทึกผล</span></div>
+        <div class="exp-kpi"><b>${groups.length}</b><span>ชุดการทดลอง</span></div>
+        <div class="exp-kpi"><b>${best||'-'}</b><span>Best Group</span></div>
+        <div class="exp-kpi"><b>${rs.length?Math.round(contam/rs.length*100):0}%</b><span>Contamination</span></div>
+      </div>
+      <div class="card" style="margin-bottom:12px">
+        <div style="display:flex;justify-content:space-between;gap:8px;align-items:flex-start">
+          <div style="min-width:0"><div class="exp-title">${esc(e.name)}</div><div class="exp-meta">สูตรอาหาร: ${esc(e.formula||'-')}</div></div>
+          <div style="display:flex;gap:6px"><button class="btn btn-outline btn-sm" onclick="openExperimentModal('${esc(e.id)}')">แก้ไข</button><button class="btn btn-danger btn-sm" style="width:auto" onclick="deleteExperiment('${esc(e.id)}')">ลบ</button></div>
+        </div>
+        <div style="margin-top:8px">${(e.groups||'').split(',').map(x=>x.trim()).filter(Boolean).map(x=>`<span class="exp-pill">${esc(x)}</span>`).join('')||'<span class="exp-pill">ไม่ระบุชุดทดลอง</span>'}</div>
+        <div class="exp-meta" style="margin-top:8px"><b>ขั้นตอน:</b> ${esc(e.steps||'-')}</div>
+        <div class="exp-meta"><b>เกณฑ์:</b> ${esc(e.criteria||'-')}</div>
+        <div class="exp-meta"><b>สรุป:</b> ${esc(e.summary||'-')}</div>
+      </div>
+      <div class="card" style="margin-bottom:12px">
+        <div class="exp-section-title"><div class="section-label">กราฟผลการทดลอง</div><button class="btn btn-outline btn-sm" onclick="openExperimentResultModal('${esc(e.id)}')">+ เพิ่มผล</button></div>
+        <div class="chart-container"><canvas id="experimentChart"></canvas></div>
+        <div id="experimentAutoSummary" class="alert alert-success" style="margin-top:12px"></div>
+      </div>
+      <div class="card">
+        <div class="section-label">5. ตารางบันทึกผล</div>
+        <div id="experimentResultTable"></div>
+      </div>`;
+    renderExperimentChart(rs);
+    renderExperimentResultTable(rs);
+  }
+
+  function bestGroup(rs){
+    const map={}; rs.forEach(r=>{const g=r.group||'ไม่ระบุ'; if(!map[g])map[g]=[]; map[g].push(Number(r.shoots||0)+Number(r.roots||0)+Number(r.length||0));});
+    const rows=Object.entries(map).map(([g,a])=>[g,avg(a)]).sort((a,b)=>b[1]-a[1]); return rows[0]?.[0]||'';
+  }
+  function renderExperimentChart(rs){
+    const canvas=document.getElementById('experimentChart'); if(!canvas||!window.Chart)return;
+    if(expChart)try{expChart.destroy()}catch(e){}
+    const groups=[...new Set(rs.map(r=>r.group||'ไม่ระบุ'))];
+    const days=[...new Set(rs.map(r=>Number(r.day)||0))].sort((a,b)=>a-b);
+    const datasets=groups.map(g=>({label:g,data:days.map(d=>avg(rs.filter(r=>(r.group||'ไม่ระบุ')===g && (Number(r.day)||0)===d).map(r=>Number(r.shoots||0)+Number(r.roots||0)+Number(r.length||0)))),tension:.3,fill:false}));
+    expChart=new Chart(canvas,{type:'line',data:{labels:days.map(d=>'Day '+d),datasets},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:true,labels:{boxWidth:10,font:{size:10}}}},scales:{y:{beginAtZero:true}}}});
+    const sum=document.getElementById('experimentAutoSummary'); if(sum){const b=bestGroup(rs);sum.innerHTML=`<div><div class="alert-title">สรุปอัตโนมัติ</div><div class="alert-body">${rs.length?`กลุ่มที่เด่นที่สุดตอนนี้คือ ${esc(b)} จากค่าเฉลี่ยรวมของจำนวนยอด/ราก/ความยาว และมีบันทึกผลทั้งหมด ${rs.length} รายการ`:'ยังไม่มีข้อมูลผลการทดลองสำหรับสร้างกราฟ'}</div></div>`;}
+  }
+  function renderExperimentResultTable(rs){
+    const el=document.getElementById('experimentResultTable'); if(!el)return;
+    if(!rs.length){el.innerHTML='<div class="exp-empty">ยังไม่มีผลการทดลอง กด “+ เพิ่มผล” เพื่อบันทึก Day / จำนวนยอด / จำนวนราก / รูปภาพ</div>';return;}
+    el.innerHTML=`<table class="exp-table"><thead><tr><th>วัน</th><th>Group</th><th>ผล</th><th>รูป</th><th></th></tr></thead><tbody>${rs.map(r=>`<tr><td>${esc(r.date||'')}<br><span style="color:var(--text3)">Day ${esc(r.day||'')}</span></td><td>${esc(r.group||'-')}</td><td>ยอด ${esc(r.shoots||0)} · ราก ${esc(r.roots||0)}<br>ยาว ${esc(r.length||0)} cm · ${esc(r.status||'')}</td><td>${(r.photos||[]).slice(0,2).map(p=>`<img class="exp-thumb" src="${p}">`).join('')}</td><td><button class="btn btn-outline btn-sm" onclick="openExperimentResultModal('${esc(r.experimentId)}','${esc(r.id)}')">แก้ไข</button><button class="btn btn-danger btn-sm" style="width:auto;margin-top:4px" onclick="deleteExperimentResult('${esc(r.id)}')">ลบ</button></td></tr>`).join('')}</tbody></table>`;
+  }
+
+  window.selectExperiment=function(id){currentExperimentId=id; renderExperimentMode();};
+  window.openExperimentModal=function(id){
+    ensureExperimentUI(); populateExperimentFormulaSelect();
+    const e=id?experimentById(id):null;
+    document.getElementById('experimentModalTitle').textContent=e?'แก้ไขการทดลอง':'เพิ่มการทดลอง';
+    document.getElementById('exp_id').value=e?.id||'';
+    document.getElementById('exp_name').value=e?.name||'';
+    document.getElementById('exp_formula').value=e?.formula||'';
+    document.getElementById('exp_groups').value=e?.groups||'';
+    document.getElementById('exp_steps').value=e?.steps||'';
+    document.getElementById('exp_criteria').value=e?.criteria||'';
+    document.getElementById('exp_summary').value=e?.summary||'';
+    document.getElementById('experimentModal').classList.remove('hidden');
+  };
+  window.saveExperiment=async function(){
+    const name=document.getElementById('exp_name').value.trim(); if(!name){show('กรุณากรอกชื่อการทดลอง');return;}
+    const u=usersCurrent(); const id=document.getElementById('exp_id').value||uid('exp_');
+    const data={id,name,formula:document.getElementById('exp_formula').value,groups:document.getElementById('exp_groups').value.trim(),steps:document.getElementById('exp_steps').value.trim(),criteria:document.getElementById('exp_criteria').value.trim(),summary:document.getElementById('exp_summary').value.trim(),ownerId:u?.id||'',ownerName:u?.name||'',createdAt:experimentById(id)?.createdAt||Date.now(),updatedAt:Date.now()};
+    const{db,doc,setDoc}=FS; await setDoc(doc(db,EXP_COL,id),data); currentExperimentId=id; closeModal('experimentModal'); renderExperimentMode(); show('บันทึกการทดลองแล้ว');
+  };
+  window.deleteExperiment=async function(id){
+    if(!confirm('ลบการทดลองนี้ใช่ไหม? ผลบันทึกจะยังอยู่ แต่จะไม่แสดงในรายการนี้'))return;
+    const{db,doc,deleteDoc}=FS; await deleteDoc(doc(db,EXP_COL,id)); currentExperimentId=null; renderExperimentMode(); show('ลบการทดลองแล้ว');
+  };
+
+  window.openExperimentResultModal=function(expId,resId){
+    ensureExperimentUI(); populateResultCultureSelect();
+    const r=resId?(window._experimentResults||[]).find(x=>x.id===resId):null;
+    document.getElementById('resultModalTitle').textContent=r?'แก้ไขผลการทดลอง':'เพิ่มผลการทดลอง';
+    document.getElementById('res_id').value=r?.id||'';
+    document.getElementById('res_experimentId').value=expId;
+    document.getElementById('res_date').value=r?.date||today();
+    document.getElementById('res_day').value=r?.day||'';
+    document.getElementById('res_group').value=r?.group||'';
+    document.getElementById('res_cultureId').value=r?.cultureId||'';
+    document.getElementById('res_shoots').value=r?.shoots||'';
+    document.getElementById('res_roots').value=r?.roots||'';
+    document.getElementById('res_length').value=r?.length||'';
+    document.getElementById('res_status').value=r?.status||'Normal';
+    document.getElementById('res_note').value=r?.note||'';
+    document.getElementById('res_photoPreview').innerHTML=(r?.photos||[]).map(p=>`<img class="exp-thumb" src="${p}">`).join('');
+    document.getElementById('res_photos').value='';
+    window.__resExistingPhotos=r?.photos||[];
+    document.getElementById('experimentResultModal').classList.remove('hidden');
+  };
+  window.previewExperimentPhotos=async function(input){
+    const files=[...(input.files||[])]; const photos=[];
+    for(const f of files){photos.push(await fileToSmallDataUrl(f));}
+    window.__resNewPhotos=photos;
+    document.getElementById('res_photoPreview').innerHTML=[...(window.__resExistingPhotos||[]),...photos].map(p=>`<img class="exp-thumb" src="${p}">`).join('');
+  };
+  async function fileToSmallDataUrl(file){
+    return new Promise(resolve=>{const img=new Image(); const rd=new FileReader(); rd.onload=e=>{img.onload=()=>{const max=900; let w=img.width,h=img.height; if(Math.max(w,h)>max){if(w>h){h=Math.round(h*max/w);w=max}else{w=Math.round(w*max/h);h=max}} const c=document.createElement('canvas'); c.width=w;c.height=h; c.getContext('2d').drawImage(img,0,0,w,h); resolve(c.toDataURL('image/jpeg',.72));}; img.src=e.target.result;}; rd.readAsDataURL(file);});
+  }
+  window.saveExperimentResult=async function(){
+    const expId=document.getElementById('res_experimentId').value; if(!expId){show('ไม่พบการทดลอง');return;}
+    const id=document.getElementById('res_id').value||uid('res_'); const u=usersCurrent();
+    const data={id,experimentId:expId,date:document.getElementById('res_date').value||today(),day:Number(document.getElementById('res_day').value)||0,group:document.getElementById('res_group').value.trim(),cultureId:document.getElementById('res_cultureId').value,shoots:Number(document.getElementById('res_shoots').value)||0,roots:Number(document.getElementById('res_roots').value)||0,length:Number(document.getElementById('res_length').value)||0,status:document.getElementById('res_status').value,note:document.getElementById('res_note').value.trim(),photos:[...(window.__resExistingPhotos||[]),...(window.__resNewPhotos||[])],ownerId:u?.id||'',ownerName:u?.name||'',createdAt:(window._experimentResults||[]).find(x=>x.id===id)?.createdAt||Date.now(),updatedAt:Date.now()};
+    const{db,doc,setDoc}=FS; await setDoc(doc(db,RES_COL,id),data); window.__resExistingPhotos=[]; window.__resNewPhotos=[]; closeModal('experimentResultModal'); renderExperimentMode(); show('บันทึกผลการทดลองแล้ว');
+  };
+  window.deleteExperimentResult=async function(id){if(!confirm('ลบผลการทดลองนี้ใช่ไหม?'))return; const{db,doc,deleteDoc}=FS; await deleteDoc(doc(db,RES_COL,id)); renderExperimentMode(); show('ลบผลแล้ว');};
+
+  function populateExperimentSelectsInCultureForm(){
+    // ถ้าไฟล์มีช่อง experiment อยู่แล้ว จะเติมตัวเลือกให้โดยอัตโนมัติ
+    ['culture_experiment','c_experiment','experimentId','expSelect'].forEach(id=>{const sel=document.getElementById(id); if(sel&&sel.tagName==='SELECT'){const val=sel.value; sel.innerHTML='<option value="">ไม่อยู่ในการทดลอง</option>'+(window._experiments||[]).map(e=>`<option value="${esc(e.id)}">${esc(e.name)}</option>`).join(''); sel.value=val;}});
+  }
+
+  const oldSwitch=window.switchLabTab;
+  if(oldSwitch&&!window.__experimentSwitchPatched){
+    window.__experimentSwitchPatched=true;
+    window.switchLabTab=function(tab,el){
+      ensureExperimentUI();
+      if(tab==='experiment'){
+        document.querySelectorAll('[id^="labTab-"]').forEach(x=>x.classList.add('hidden'));
+        document.getElementById('labTab-experiment')?.classList.remove('hidden');
+        document.querySelectorAll('#labTabs .tab-btn').forEach(b=>b.classList.remove('active'));
+        if(el)el.classList.add('active');
+        renderExperimentMode();
+        return;
+      }
+      oldSwitch(tab,el);
+    };
+  }
+  const oldShowPage=window.showPage;
+  if(oldShowPage&&!window.__experimentShowPagePatched){
+    window.__experimentShowPagePatched=true;
+    window.showPage=function(name){oldShowPage(name); setTimeout(()=>{ensureExperimentUI(); setupExperimentRealtime(); populateExperimentFormulaSelect(); populateExperimentSelectsInCultureForm(); if(name==='lab')renderExperimentMode();},200);};
+  }
+  const oldRefresh=window.refreshCurrentPage;
+  if(oldRefresh&&!window.__experimentRefreshPatched){
+    window.__experimentRefreshPatched=true;
+    window.refreshCurrentPage=function(){oldRefresh(); setTimeout(()=>{ensureExperimentUI(); setupExperimentRealtime(); populateExperimentSelectsInCultureForm(); if((window.currentPage||'')==='lab')renderExperimentMode();},150);};
+  }
+  document.addEventListener('DOMContentLoaded',()=>setTimeout(()=>{ensureExperimentUI(); setupExperimentRealtime(); populateExperimentFormulaSelect(); renderExperimentMode();},900));
+  setTimeout(()=>{ensureExperimentUI(); setupExperimentRealtime(); renderExperimentMode();},1500);
+})();
+</script>
+
 
 </body>
 </html>
