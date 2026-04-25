@@ -576,23 +576,23 @@ textarea.inp{resize:vertical;min-height:72px}
           <div class="card" style="margin-bottom:14px">
             <div class="form-row">
               <div class="form-group" style="margin:0">
-                <label class="form-label">อุณหภูมิ (°C) <span class="form-req">*</span></label>
-                <div class="inp-unit"><input class="inp" id="t_temp" type="number" step="0.1" placeholder="26.5"/><span>°C</span></div>
+                <label class="form-label">อุณหภูมิ Max (°C) <span class="form-req">*</span></label>
+                <div class="inp-unit"><input class="inp" id="t_temp_max" type="number" step="0.1" placeholder="30.0"/><span>°C</span></div>
               </div>
               <div class="form-group" style="margin:0">
-                <label class="form-label">ความชื้น (%)</label>
-                <div class="inp-unit"><input class="inp" id="t_humid" type="number" step="1" placeholder="65"/><span>%</span></div>
+                <label class="form-label">อุณหภูมิ Min (°C) <span class="form-req">*</span></label>
+                <div class="inp-unit"><input class="inp" id="t_temp_min" type="number" step="0.1" placeholder="24.0"/><span>°C</span></div>
               </div>
             </div>
             <div class="form-group" style="margin-top:10px;margin-bottom:0">
-              <label class="form-label">วัน-เวลา</label>
-              <input class="inp" id="t_datetime" type="datetime-local"/>
+              <label class="form-label">วันที่</label>
+              <input class="inp" id="t_datetime" type="date"/>
             </div>
             <div class="form-group" style="margin-top:10px;margin-bottom:10px">
               <label class="form-label">หมายเหตุ</label>
               <input class="inp" id="t_note" type="text" placeholder="เช่น ปรับแอร์, ไฟดับ..."/>
             </div>
-            <button class="btn btn-primary" onclick="saveTemp()">บันทึกอุณหภูมิ</button>
+            <button class="btn btn-primary" onclick="saveTemp()">บันทึกอุณหภูมิรายวัน</button>
           </div>
           <div class="chart-tabs" id="tempChartTabs">
             <div class="chart-tab active" onclick="setTempRange(7,this)">7 วัน</div>
@@ -1183,6 +1183,7 @@ let tempChartInstance=null;
 let dashTempChartInstance=null;
 let pendingPhotosAdd=[];
 let pendingPhotosUpdate=[];
+let currentUpdateEditIndex=-1;
 
 
 // ──────────────────────────────────────────────
@@ -2050,7 +2051,9 @@ function normalizeCultureUpdates(c){
       growth:u.growth||u.action||'',
       note:u.note||'',
       photos:Array.isArray(u.photos)?u.photos:[],
-      updatedBy:u.updatedBy||u.user||''
+      updatedBy:u.updatedBy||u.user||'',
+      source:u.source||'',
+      editedAt:u.editedAt||''
     }))
     .sort((a,b)=>new Date(a.date)-new Date(b.date));
 }
@@ -2286,26 +2289,63 @@ async function deleteCulture(id){
 // ──────────────────────────────────────────────
 // UPDATE MODAL
 // ──────────────────────────────────────────────
+function isStatusUpdateRecord(u){
+  if(!u||typeof u!=='object')return false;
+  if(u.source==='status_update')return true;
+  if((u.growth||'').includes('แก้ไขข้อมูล Culture'))return false;
+  return u.shoots!==undefined||u.roots!==undefined||u.shootLen!==undefined||u.rootLen!==undefined||u.growth||u.note||(Array.isArray(u.photos)&&u.photos.length);
+}
+
+function getLatestStatusUpdateInfo(c){
+  const updates=normalizeCultureUpdates(c);
+  for(let i=updates.length-1;i>=0;i--){
+    if(isStatusUpdateRecord(updates[i]))return {update:updates[i],index:i,updates};
+  }
+  return {update:null,index:-1,updates};
+}
+
 function openUpdateModal(id){
   currentDetailId=id;
   const target=DB.allCultures().find(x=>x.id===id);
   if(!canEditItem(target,'cultures')){showToast('บัญชีนี้ไม่มีสิทธิ์อัปเดต Culture นี้');return;}
-  const c=DB.cultures().find(x=>x.id===id);
-  if(c){document.getElementById('u_status').value=c.status||'growing_normal';}
-  ['u_shoots','u_roots','u_shootLen','u_rootLen','u_growth','u_note','u_closedate'].forEach(id=>document.getElementById(id).value='');
-  pendingPhotosUpdate=[];
-  document.getElementById('updatePhotosPreview').innerHTML='';
+
+  const c=DB.allCultures().find(x=>x.id===id) || target;
+  const info=getLatestStatusUpdateInfo(c);
+  const last=info.update;
+  currentUpdateEditIndex=info.index;
+
+  document.getElementById('u_status').value=(last?.status||c?.status||'growing_normal');
+  document.getElementById('u_shoots').value=(last?.shoots??'');
+  document.getElementById('u_roots').value=(last?.roots??'');
+  document.getElementById('u_shootLen').value=(last?.shootLen??'');
+  document.getElementById('u_rootLen').value=(last?.rootLen??'');
+  document.getElementById('u_growth').value=(last?.growth||'');
+  document.getElementById('u_note').value=(last?.note||'');
+  document.getElementById('u_closedate').value=c?.closedDate||'';
+
+  pendingPhotosUpdate=(Array.isArray(last?.photos)?last.photos:[]).map(p=>({...p}));
+  renderPendingPhotos('updatePhotosPreview',pendingPhotosUpdate,true,'updatePhotos');
+
   document.getElementById('updateModal').classList.remove('hidden');
 }
 
 async function saveUpdate(){
-  const target=DB.allCultures().find(x=>x.id===currentDetailId);if(!canEditItem(target,'cultures')){showToast('บัญชีนี้ไม่มีสิทธิ์อัปเดต Culture นี้');return;}
+  const target=DB.allCultures().find(x=>x.id===currentDetailId);
+  if(!canEditItem(target,'cultures')){showToast('บัญชีนี้ไม่มีสิทธิ์อัปเดต Culture นี้');return;}
+
   const id=currentDetailId;
   const c=DB.allCultures().find(x=>x.id===id);
   if(!c)return;
+
   const status=document.getElementById('u_status').value;
+  const existing=normalizeCultureUpdates(c);
+  const info=getLatestStatusUpdateInfo(c);
+  const previous=(info.index>=0&&existing[info.index])?existing[info.index]:null;
+
   const update={
-    date:localDateTimeInput(),
+    source:'status_update',
+    date:previous?.date||localDateTimeInput(),
+    editedAt:localDateTimeInput(),
     status,
     shoots:document.getElementById('u_shoots').value!==''?parseFloat(document.getElementById('u_shoots').value):null,
     roots:document.getElementById('u_roots').value!==''?parseFloat(document.getElementById('u_roots').value):null,
@@ -2313,16 +2353,24 @@ async function saveUpdate(){
     rootLen:document.getElementById('u_rootLen').value!==''?parseFloat(document.getElementById('u_rootLen').value):null,
     growth:document.getElementById('u_growth').value.trim(),
     note:document.getElementById('u_note').value.trim(),
-    photos:pendingPhotosUpdate.slice(),
+    photos:pendingPhotosUpdate.map(p=>({...p})),
     updatedBy:currentUser?.name||currentUser?.email||''
   };
-  const updated={...c,status,updatedAt:localDateTimeInput(),updates:[...normalizeCultureUpdates(c),update]};
+
+  const newUpdates=existing.slice();
+  if(info.index>=0)newUpdates[info.index]=update;
+  else newUpdates.push(update);
+
+  const updated={...c,status,updatedAt:localDateTimeInput(),updates:newUpdates};
   const closeDate=document.getElementById('u_closedate').value;
   if(closeDate)updated.closedDate=closeDate;
+  else delete updated.closedDate;
+
   showToast('กำลังบันทึก...');
   await DB.saveCulture(updated);
   closeModal('updateModal');
   pendingPhotosUpdate=[];
+  currentUpdateEditIndex=-1;
   showToast('อัพเดตสำเร็จ');
   showDetail(id);
 }
@@ -2343,7 +2391,7 @@ async function handlePhotoUpload(input,target){
         renderPendingPhotos('addPhotosPreview',pendingPhotosAdd);
       } else {
         pendingPhotosUpdate.push(photo);
-        renderPendingPhotos('updatePhotosPreview',pendingPhotosUpdate);
+        renderPendingPhotos('updatePhotosPreview',pendingPhotosUpdate,true,'updatePhotos');
       }
     }catch(e){console.error(e);showToast('เพิ่มรูปไม่สำเร็จ');}
   }
@@ -2368,8 +2416,19 @@ function resizePhotoForStorage(file,max=1000,quality=.72){
     reader.readAsDataURL(file);
   });
 }
-function renderPendingPhotos(containerId,photos){
-  document.getElementById(containerId).innerHTML=`<div class="photo-grid">${photos.map((p,i)=>`<div class="photo-thumb"><img src="${p.data}"/><div class="photo-date">${p.date}</div></div>`).join('')}</div>`;
+function renderPendingPhotos(containerId,photos,removable=false,target=''){
+  const el=document.getElementById(containerId); if(!el)return;
+  if(!photos.length){el.innerHTML='';return;}
+  el.innerHTML=`<div class="photo-grid">${photos.map((p,i)=>`<div class="photo-thumb"><img src="${p.data}"/><div class="photo-date">${p.date||''}</div>${removable?`<button onclick="removePendingPhoto('${target}',${i})" style="position:absolute;top:4px;right:4px;width:22px;height:22px;border-radius:50%;background:rgba(185,28,28,.92);color:#fff;font-size:14px;line-height:22px;text-align:center">×</button>`:''}</div>`).join('')}</div>`;
+}
+function removePendingPhoto(target,index){
+  if(target==='updatePhotos'){
+    pendingPhotosUpdate.splice(index,1);
+    renderPendingPhotos('updatePhotosPreview',pendingPhotosUpdate,true,'updatePhotos');
+  }else if(target==='addPhotos'){
+    pendingPhotosAdd.splice(index,1);
+    renderPendingPhotos('addPhotosPreview',pendingPhotosAdd,true,'addPhotos');
+  }
 }
 
 function openLightbox(src){
@@ -2382,17 +2441,18 @@ function closeLightbox(){document.getElementById('lightbox').classList.add('hidd
 // TEMPERATURE
 // ──────────────────────────────────────────────
 async function saveTemp(){
-  const temp=parseFloat(document.getElementById('t_temp').value);
-  const humid=document.getElementById('t_humid').value?parseFloat(document.getElementById('t_humid').value):null;
+  const tempMax=parseFloat(document.getElementById('t_temp_max').value);
+  const tempMin=parseFloat(document.getElementById('t_temp_min').value);
   const datetime=document.getElementById('t_datetime').value;
   const note=document.getElementById('t_note').value.trim();
-  if(!datetime||isNaN(temp)){showToast('กรุณากรอกวัน-เวลาและอุณหภูมิ');return;}
+  if(!datetime||isNaN(tempMax)||isNaN(tempMin)){showToast('กรุณากรอกวันที่และค่า Max-Min');return;}
+  if(tempMin>tempMax){showToast('ค่า Min ต้องไม่มากกว่า Max');return;}
   showToast('กำลังบันทึก...');
-  await DB.saveTemp({id:'t'+Date.now(),datetime,temp,humidity:humid,note});
-  document.getElementById('t_temp').value='';
-  document.getElementById('t_humid').value='';
+  await DB.saveTemp({id:'t'+Date.now(),datetime,tempMax,tempMin,temp:Math.round(((tempMax+tempMin)/2)*10)/10,note});
+  document.getElementById('t_temp_max').value='';
+  document.getElementById('t_temp_min').value='';
   document.getElementById('t_note').value='';
-  showToast('บันทึกอุณหภูมิสำเร็จ');
+  showToast('บันทึกอุณหภูมิรายวันสำเร็จ');
   renderTempHistory();
   renderTempChart();
 }
@@ -2410,6 +2470,8 @@ function getFilteredTemps(){
   const cutoff=new Date();cutoff.setDate(cutoff.getDate()-tempRange);
   return temps.filter(t=>new Date(t.datetime)>=cutoff);
 }
+function tempMaxValue(t){return t.tempMax??t.max??t.temp??null;}
+function tempMinValue(t){return t.tempMin??t.min??t.temp??null;}
 
 function renderTempChart(){
   const data=getFilteredTemps();
@@ -2421,13 +2483,12 @@ function renderTempChart(){
     data:{
       labels:data.map(t=>formatDateShort(t.datetime)),
       datasets:[
-        {label:'อุณหภูมิ (°C)',data:data.map(t=>t.temp),borderColor:'#e67e22',backgroundColor:'rgba(230,126,34,.1)',tension:.3,fill:true,yAxisID:'y',pointRadius:3},
-        {label:'ความชื้น (%)',data:data.map(t=>t.humidity),borderColor:'#2980b9',backgroundColor:'rgba(41,128,185,.1)',tension:.3,fill:false,yAxisID:'y1',pointRadius:3}
+        {label:'Max (°C)',data:data.map(t=>tempMaxValue(t)),borderColor:'#dc2626',backgroundColor:'rgba(220,38,38,.08)',tension:.3,fill:false,yAxisID:'y',pointRadius:3},
+        {label:'Min (°C)',data:data.map(t=>tempMinValue(t)),borderColor:'#2563eb',backgroundColor:'rgba(37,99,235,.08)',tension:.3,fill:false,yAxisID:'y',pointRadius:3}
       ]
     },
     options:{responsive:true,maintainAspectRatio:false,interaction:{mode:'index',intersect:false},plugins:{legend:{labels:{font:{size:11},boxWidth:12}}},scales:{
       y:{type:'linear',position:'left',title:{display:true,text:'°C',font:{size:10}},ticks:{font:{size:10}}},
-      y1:{type:'linear',position:'right',title:{display:true,text:'%',font:{size:10}},ticks:{font:{size:10}},grid:{drawOnChartArea:false}},
       x:{ticks:{font:{size:9},maxRotation:45}}
     }}
   });
@@ -2440,8 +2501,11 @@ function renderDashTempChart(){
   if(dashTempChartInstance)dashTempChartInstance.destroy();
   dashTempChartInstance=new Chart(ctx,{
     type:'line',
-    data:{labels:data.map(t=>formatDateShort(t.datetime)),datasets:[{label:'°C',data:data.map(t=>t.temp),borderColor:'#e67e22',backgroundColor:'rgba(230,126,34,.1)',tension:.3,fill:true,pointRadius:2}]},
-    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{y:{ticks:{font:{size:10}}},x:{ticks:{font:{size:9},maxRotation:45}}}}
+    data:{labels:data.map(t=>formatDateShort(t.datetime)),datasets:[
+      {label:'Max',data:data.map(t=>tempMaxValue(t)),borderColor:'#dc2626',backgroundColor:'rgba(220,38,38,.08)',tension:.3,fill:false,pointRadius:2},
+      {label:'Min',data:data.map(t=>tempMinValue(t)),borderColor:'#2563eb',backgroundColor:'rgba(37,99,235,.08)',tension:.3,fill:false,pointRadius:2}
+    ]},
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{labels:{font:{size:10},boxWidth:10}}},scales:{y:{ticks:{font:{size:10}}},x:{ticks:{font:{size:9},maxRotation:45}}}}
   });
 }
 
@@ -2452,8 +2516,8 @@ function renderTempHistory(){
   if(!temps.length){el.innerHTML='<div class="empty"><div class="empty-text">ยังไม่มีข้อมูลอุณหภูมิ</div></div>';return;}
   el.innerHTML=temps.map(t=>`<div class="card" style="margin-bottom:8px;display:flex;justify-content:space-between;align-items:center;gap:8px">
     <div style="flex:1">
-      <div style="font-size:13px;font-weight:500;color:var(--text)">${t.temp}°C ${t.humidity?'· '+t.humidity+'%':''}</div>
-      <div style="font-size:11px;color:var(--text3)">${formatDateTime(t.datetime)}${t.note?' · '+t.note:''}</div>
+      <div style="font-size:13px;font-weight:500;color:var(--text)">Max ${tempMaxValue(t)??'-'}°C · Min ${tempMinValue(t)??'-'}°C</div>
+      <div style="font-size:11px;color:var(--text3)">${formatDateShort(t.datetime)}${t.note?' · '+t.note:''}</div>
     </div>
     <button onclick="deleteTemp('${t.id}')" style="color:var(--danger);font-size:11px;padding:4px 8px;border:1px solid var(--danger-light);border-radius:6px;background:var(--danger-light);cursor:pointer;flex-shrink:0">ลบ</button>
   </div>`).join('');
