@@ -1143,7 +1143,7 @@ async function seedDemo(){
   const saRef=doc(db,'users','SUPERADMIN');
   const saSnap=await getDoc(saRef);
   if(!saSnap.exists()){
-    await setDoc(saRef,{id:'SUPERADMIN',name:'สาธิต ฉัตรพันธุ์',email:'Satit.c@psru.ac.th',pass:'254102',role:'admin',approved:true,avatar:'ส',superadmin:true});
+    await setDoc(saRef,fixedSuperAdminUser({}));
   }
   // Seed default plants if empty
   if(DB._plants.length===0){
@@ -1184,6 +1184,30 @@ let dashTempChartInstance=null;
 let pendingPhotosAdd=[];
 let pendingPhotosUpdate=[];
 
+
+// ──────────────────────────────────────────────
+// LOCKED SUPER ADMIN + CHART PALETTES
+// ──────────────────────────────────────────────
+const LOCKED_SUPERADMIN_EMAIL='satit.c@psru.ac.th';
+const LOCKED_SUPERADMIN_ID='SUPERADMIN';
+const SPECIES_DONUT_COLORS=['#2d6a4f','#1d4ed8','#f59e0b','#dc2626','#7c3aed','#0891b2','#db2777','#65a30d','#ea580c','#0f766e','#9333ea','#2563eb'];
+const GROWTH_GREEN_COLORS=['#d8f3dc','#95d5b2','#52b788','#2d6a4f','#1b4332'];
+const MEDIA_BLUE_COLORS=['#dbeafe','#93c5fd','#60a5fa','#2563eb','#1e3a8a'];
+const CONTAM_RED_COLORS=['#fee2e2','#fecaca','#f87171','#dc2626','#7f1d1d'];
+function isLockedSuperAdminEmail(email){return String(email||'').toLowerCase()===LOCKED_SUPERADMIN_EMAIL;}
+function fixedSuperAdminUser(base={}){
+  return {...base,id:LOCKED_SUPERADMIN_ID,name:base.name||'สาธิต ฉัตรพันธุ์',email:'Satit.c@psru.ac.th',pass:base.pass||'254102',role:'admin',approved:true,avatar:base.avatar||'ส',superadmin:true,permissions:{...(base.permissions||{}),viewAllCultures:true,addCultures:true,editCultures:true,deleteCultures:true,managePlants:true,manageFormulas:true,viewNotes:true,editNotes:true,manageLabTools:true,manageUsers:true}};
+}
+function forceLockedSuperAdmin(user){
+  if(user && (isLockedSuperAdminEmail(user.email)||user.id===LOCKED_SUPERADMIN_ID)){
+    const fixed=fixedSuperAdminUser(user);
+    Object.assign(user,fixed);
+    try{ if(window.DB && DB.saveUser) DB.saveUser({...fixed}); }catch(e){}
+  }
+  return user;
+}
+function isCurrentSuperAdmin(){return !!(currentUser && currentUser.superadmin===true && isLockedSuperAdminEmail(currentUser.email));}
+
 // ──────────────────────────────────────────────
 // PERMISSION SYSTEM (client-side role controls)
 // ──────────────────────────────────────────────
@@ -1202,7 +1226,8 @@ const DEFAULT_PERMISSIONS = {
 
 function getPerms(user=currentUser){
   if(!user)return {...DEFAULT_PERMISSIONS};
-  if(user.superadmin || user.role==='admin'){
+  if(isLockedSuperAdminEmail(user.email)||user.superadmin){
+    user=forceLockedSuperAdmin(user);
     return {
       viewAllCultures:true,
       addCultures:true,
@@ -1215,6 +1240,22 @@ function getPerms(user=currentUser){
       manageLabTools:true,
       manageUsers:true,
       ...(user.permissions||{})
+    };
+  }
+  if(user.role==='admin'){
+    return {
+      viewAllCultures:true,
+      addCultures:true,
+      editCultures:true,
+      deleteCultures:true,
+      managePlants:true,
+      manageFormulas:true,
+      viewNotes:true,
+      editNotes:true,
+      manageLabTools:true,
+      manageUsers:false,
+      ...(user.permissions||{}),
+      manageUsers:false
     };
   }
   return {...DEFAULT_PERMISSIONS,...(user.permissions||{})};
@@ -1247,8 +1288,9 @@ function permissionCheckbox(user,key,label){
   </label>`;
 }
 async function toggleUserPermission(id,key,value){
+  if(!isCurrentSuperAdmin()){showToast('เฉพาะ Super Admin เท่านั้นที่กำหนดสิทธิ์ได้');return;}
   const u=DB.users().find(x=>x.id===id);
-  if(!u||u.superadmin||u.role==='admin')return;
+  if(!u||u.superadmin||isLockedSuperAdminEmail(u.email)||u.role==='admin')return;
   u.permissions={...DEFAULT_PERMISSIONS,...(u.permissions||{}),[key]:!!value};
   await DB.saveUser(u);
   showToast('อัปเดตสิทธิ์แล้ว');
@@ -1313,7 +1355,7 @@ function doLogin(){
     btn.disabled=true;btn.style.opacity='0.6';
     const{db,collection,getDocs}=FS;
     getDocs(collection(db,'users')).then(snap=>{
-      DB._users=snap.docs.map(d=>d.data());
+      DB._users=snap.docs.map(d=>forceLockedSuperAdmin(d.data()));
       btn.disabled=false;btn.style.opacity='1';status.style.display='none';
       _doLoginCheck(email,pass,err);
     }).catch(()=>{
@@ -1330,11 +1372,11 @@ function _doLoginCheck(email,pass,err){
   if(!user){err.textContent='อีเมลหรือรหัสผ่านไม่ถูกต้อง';err.style.display='block';return;}
   if(!user.approved){err.textContent='บัญชียังรอการอนุมัติจาก Admin';err.style.display='block';return;}
   err.style.display='none';
-  currentUser=user;
+  currentUser=forceLockedSuperAdmin(user);
   try{localStorage.setItem('tmc_session',JSON.stringify({id:user.id,email:user.email,time:Date.now()}));}catch(e){}
   document.getElementById('login-page').classList.add('hidden');
   document.getElementById('app').classList.remove('hidden');
-  document.getElementById('userAvatar').textContent=user.avatar||user.name[0];
+  document.getElementById('userAvatar').textContent=currentUser.avatar||currentUser.name[0];
   document.getElementById('mainFab').classList.remove('hidden');
   initApp();
   setupRealtimeSync();
@@ -1633,8 +1675,8 @@ function renderAnalytics(){
   const ctx1=document.getElementById('formulaChart');
   if(ctx1){
     analyticsCharts.push(new Chart(ctx1,{type:'bar',data:{labels:fLabels,datasets:[
-      {label:'โตดี (%)',data:fSuccess,backgroundColor:'rgba(64,145,108,.7)',borderRadius:4},
-      {label:'Contaminated (%)',data:fCont,backgroundColor:'rgba(185,28,28,.5)',borderRadius:4}
+      {label:'โตดี (%)',data:fSuccess,backgroundColor:fLabels.map((_,i)=>MEDIA_BLUE_COLORS[i%MEDIA_BLUE_COLORS.length]),borderRadius:4},
+      {label:'Contaminated (%)',data:fCont,backgroundColor:fLabels.map((_,i)=>CONTAM_RED_COLORS[i%CONTAM_RED_COLORS.length]),borderRadius:4}
     ]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{labels:{font:{size:11},boxWidth:12}}},scales:{y:{max:100,ticks:{font:{size:10}}},x:{ticks:{font:{size:10}}}}}}));
   }
 
@@ -1648,7 +1690,7 @@ function renderAnalytics(){
   const pData=pLabels.map(p=>plantMap[p]);
   const ctx2=document.getElementById('plantChart');
   if(ctx2){
-    analyticsCharts.push(new Chart(ctx2,{type:'doughnut',data:{labels:pLabels,datasets:[{data:pData,backgroundColor:['#2d6a4f','#40916c','#52b788','#74c69d','#95d5b2','#b7e4c7','#d8f3dc','#1b4332']}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'right',labels:{font:{size:10},boxWidth:10}}}}}));
+    analyticsCharts.push(new Chart(ctx2,{type:'doughnut',data:{labels:pLabels,datasets:[{data:pData,backgroundColor:pLabels.map((_,i)=>SPECIES_DONUT_COLORS[i%SPECIES_DONUT_COLORS.length])}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'right',labels:{font:{size:10},boxWidth:10}}}}}));
   }
 
   // Contamination over time
@@ -1660,7 +1702,7 @@ function renderAnalytics(){
   const mKeys=Object.keys(contByMonth).sort().slice(-6);
   const ctx3=document.getElementById('contChart');
   if(ctx3){
-    analyticsCharts.push(new Chart(ctx3,{type:'line',data:{labels:mKeys,datasets:[{label:'Contamination',data:mKeys.map(k=>contByMonth[k]),borderColor:'#b91c1c',backgroundColor:'rgba(185,28,28,.1)',tension:.3,fill:true,pointRadius:4}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{y:{beginAtZero:true,ticks:{stepSize:1,font:{size:10}}},x:{ticks:{font:{size:10}}}}}}));
+    analyticsCharts.push(new Chart(ctx3,{type:'line',data:{labels:mKeys,datasets:[{label:'Contamination',data:mKeys.map(k=>contByMonth[k]),borderColor:'#7f1d1d',backgroundColor:'rgba(220,38,38,.18)',tension:.3,fill:true,pointRadius:4}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{y:{beginAtZero:true,ticks:{stepSize:1,font:{size:10}}},x:{ticks:{font:{size:10}}}}}}));
   }
 
   // Growth summary
@@ -2290,12 +2332,12 @@ function closeModal(id){document.getElementById(id).classList.add('hidden');}
 // ──────────────────────────────────────────────
 // PHOTOS
 // ──────────────────────────────────────────────
-function handlePhotoUpload(input,target){
-  const files=Array.from(input.files);
-  files.forEach(file=>{
-    const reader=new FileReader();
-    reader.onload=e=>{
-      const photo={data:e.target.result,date:localDateInput()};
+async function handlePhotoUpload(input,target){
+  const files=Array.from(input.files||[]);
+  for(const file of files){
+    try{
+      const data=await resizePhotoForStorage(file,1000,.72);
+      const photo={data,date:localDateInput()};
       if(target==='addPhotos'){
         pendingPhotosAdd.push(photo);
         renderPendingPhotos('addPhotosPreview',pendingPhotosAdd);
@@ -2303,12 +2345,29 @@ function handlePhotoUpload(input,target){
         pendingPhotosUpdate.push(photo);
         renderPendingPhotos('updatePhotosPreview',pendingPhotosUpdate);
       }
+    }catch(e){console.error(e);showToast('เพิ่มรูปไม่สำเร็จ');}
+  }
+  input.value='';
+}
+function resizePhotoForStorage(file,max=1000,quality=.72){
+  return new Promise((resolve,reject)=>{
+    const reader=new FileReader();
+    reader.onerror=reject;
+    reader.onload=e=>{
+      const img=new Image();
+      img.onerror=reject;
+      img.onload=()=>{
+        let w=img.width,h=img.height;
+        if(Math.max(w,h)>max){ if(w>h){h=Math.round(h*max/w);w=max;}else{w=Math.round(w*max/h);h=max;} }
+        const canvas=document.createElement('canvas'); canvas.width=w; canvas.height=h;
+        canvas.getContext('2d').drawImage(img,0,0,w,h);
+        resolve(canvas.toDataURL('image/jpeg',quality));
+      };
+      img.src=e.target.result;
     };
     reader.readAsDataURL(file);
   });
-  input.value='';
 }
-
 function renderPendingPhotos(containerId,photos){
   document.getElementById(containerId).innerHTML=`<div class="photo-grid">${photos.map((p,i)=>`<div class="photo-thumb"><img src="${p.data}"/><div class="photo-date">${p.date}</div></div>`).join('')}</div>`;
 }
@@ -2445,8 +2504,13 @@ function renderSettings(){
   document.getElementById('settingsName').textContent=currentUser.name;
   document.getElementById('settingsEmail').textContent=currentUser.email;
   const roleEl=document.getElementById('settingsRole');
-  roleEl.textContent=currentUser.role==='admin'?'Admin':'User';
-  roleEl.className='user-role '+(currentUser.role==='admin'?'role-admin':'role-user');
+  if(currentUser.superadmin||isLockedSuperAdminEmail(currentUser.email)){
+    roleEl.textContent='Super Admin';
+    roleEl.className='user-role role-admin';
+  }else{
+    roleEl.textContent=currentUser.role==='admin'?'Admin':'User';
+    roleEl.className='user-role '+(currentUser.role==='admin'?'role-admin':'role-user');
+  }
 
   const adminSection=document.getElementById('adminSection');
   const showAdminTools=can('manageUsers')||can('managePlants')||can('manageFormulas');
@@ -2474,18 +2538,17 @@ function renderUserManagement(){
     <div class="user-avatar" style="background:var(--warn-light);color:var(--warn-text)">${u.avatar||u.name[0]}</div>
     <div style="flex:1"><div class="user-name">${u.name}</div><div style="font-size:11px;color:var(--text3)">${u.email}</div></div>
     <div style="display:flex;gap:6px">
-      <button class="btn btn-outline btn-sm" style="color:var(--accent);border-color:var(--accent)" onclick="approveUser('${u.id}')">อนุมัติ</button>
-      <button class="btn btn-outline btn-sm" style="color:var(--danger);border-color:var(--danger)" onclick="rejectUser('${u.id}')">ปฏิเสธ</button>
+      ${isCurrentSuperAdmin()?`<button class="btn btn-outline btn-sm" style="color:var(--accent);border-color:var(--accent)" onclick="approveUser('${u.id}')">อนุมัติ</button><button class="btn btn-outline btn-sm" style="color:var(--danger);border-color:var(--danger)" onclick="rejectUser('${u.id}')">ปฏิเสธ</button>`:`<span style="font-size:11px;color:var(--text3)">รอ Super Admin</span>`}
     </div>
   </div>`).join(''):`<div style="font-size:12px;color:var(--text3);padding:8px 0">ไม่มีคำขอรออนุมัติ</div>`;
   document.getElementById('pendingUsers').innerHTML=`<div class="card">${pendHtml}</div>`;
 
-  const isSuperAdmin=currentUser.superadmin===true;
+  const isSuperAdmin=isCurrentSuperAdmin();
   let allHtml=approved.map(u=>{
     const isSA=u.superadmin===true;
-    const roleLabel=u.role==='admin'?'Admin':'User';
-    const roleClass=u.role==='admin'?'role-admin':'role-user';
-    const canManage=!isSA;
+    const roleLabel=(u.superadmin||isLockedSuperAdminEmail(u.email))?'Super Admin':(u.role==='admin'?'Admin':'User');
+    const roleClass=(u.superadmin||isLockedSuperAdminEmail(u.email)||u.role==='admin')?'role-admin':'role-user';
+    const canManage=isSuperAdmin&&!isSA;
     let actions='';
     if(canManage){
       const toggleLabel=u.role==='admin'?'เปลี่ยนเป็น User':'เปลี่ยนเป็น Admin';
@@ -2532,30 +2595,35 @@ function renderUserManagement(){
 }
 
 async function approveUser(id){
+  if(!isCurrentSuperAdmin()){showToast('เฉพาะ Super Admin เท่านั้นที่อนุมัติผู้ใช้ได้');return;}
   const u=DB.users().find(x=>x.id===id);
   if(u){u.approved=true;await DB.saveUser(u);showToast('อนุมัติ '+u.name+' แล้ว');renderUserManagement();}
 }
 async function rejectUser(id){
+  if(!isCurrentSuperAdmin()){showToast('เฉพาะ Super Admin เท่านั้นที่ปฏิเสธผู้ใช้ได้');return;}
   await DB.deleteUserById(id);
   showToast('ปฏิเสธแล้ว');renderUserManagement();
 }
 async function toggleUserRole(id){
+  if(!isCurrentSuperAdmin()){showToast('เฉพาะ Super Admin เท่านั้นที่เปลี่ยนบทบาทได้');return;}
   const u=DB.users().find(x=>x.id===id);
-  if(!u||u.superadmin)return;
+  if(!u||u.superadmin||isLockedSuperAdminEmail(u.email))return;
   u.role=u.role==='admin'?'user':'admin';
   await DB.saveUser(u);
   showToast('เปลี่ยนบทบาท '+u.name+' เป็น '+(u.role==='admin'?'Admin':'User')+' แล้ว');
   renderUserManagement();
 }
 async function deleteUser(id,name){
+  if(!isCurrentSuperAdmin()){showToast('เฉพาะ Super Admin เท่านั้นที่ลบบัญชีได้');return;}
   const u=DB.users().find(x=>x.id===id);
-  if(!u||u.superadmin){showToast('ไม่สามารถลบผู้ดูแลหลักได้');return;}
+  if(!u||u.superadmin||isLockedSuperAdminEmail(u.email)){showToast('ไม่สามารถลบ Super Admin ได้');return;}
   if(!confirm('ลบบัญชี "'+name+'" ใช่ไหม?'))return;
   await DB.deleteUserById(id);
   showToast('ลบบัญชี '+name+' แล้ว');
   renderUserManagement();
 }
 async function adminAddUser(){
+  if(!isCurrentSuperAdmin()){showToast('เฉพาะ Super Admin เท่านั้นที่เพิ่มผู้ใช้ได้');return;}
   const name=document.getElementById('adminNewName').value.trim();
   const email=document.getElementById('adminNewEmail').value.trim();
   const pass=document.getElementById('adminNewPass').value;
@@ -2837,11 +2905,12 @@ window.onFbReady=function(){
 
   const{db,collection,getDocs,doc,setDoc}=FS;
   getDocs(collection(db,'users')).then(snap=>{
-    DB._users=snap.docs.map(d=>d.data());
-    if(!DB._users.find(u=>u.superadmin)){
-      const sa={id:'SUPERADMIN',name:'สาธิต ฉัตรพันธุ์',email:'Satit.c@psru.ac.th',pass:'254102',role:'admin',approved:true,avatar:'ส',superadmin:true,permissions:{}};
-      setDoc(doc(db,'users','SUPERADMIN'),sa).then(()=>{DB._users.push(sa);});
-    }
+    DB._users=snap.docs.map(d=>forceLockedSuperAdmin(d.data()));
+    const sa=fixedSuperAdminUser(DB._users.find(u=>isLockedSuperAdminEmail(u.email)||u.id===LOCKED_SUPERADMIN_ID)||{});
+    setDoc(doc(db,'users','SUPERADMIN'),sa).then(()=>{
+      DB._users=DB._users.filter(u=>!(isLockedSuperAdminEmail(u.email)||u.id===LOCKED_SUPERADMIN_ID));
+      DB._users.push(sa);
+    });
     // Auto-login from saved session
     try{
       const sess=JSON.parse(localStorage.getItem('tmc_session')||'null');
@@ -2849,10 +2918,10 @@ window.onFbReady=function(){
         if(Date.now()-sess.time<30*86400000){
           const user=DB._users.find(u=>u.id===sess.id&&(u.email||'').toLowerCase()===sess.email.toLowerCase());
           if(user&&user.approved){
-            currentUser=user;
+            currentUser=forceLockedSuperAdmin(user);
             document.getElementById('login-page').classList.add('hidden');
             document.getElementById('app').classList.remove('hidden');
-            document.getElementById('userAvatar').textContent=user.avatar||user.name[0];
+            document.getElementById('userAvatar').textContent=currentUser.avatar||currentUser.name[0];
             document.getElementById('mainFab').classList.remove('hidden');
             initApp();
             setupRealtimeSync();
@@ -2887,10 +2956,10 @@ function setupRealtimeSync(){
   _unsubCultures=onSnapshot(collection(db,'cultures'),snap=>{DB._cultures=snap.docs.map(d=>d.data());refreshCurrentPage();});
   _unsubTemps=onSnapshot(collection(db,'temps'),snap=>{DB._temps=snap.docs.map(d=>d.data()).sort((a,b)=>a.datetime.localeCompare(b.datetime));if(currentPage==='lab'||currentPage==='dashboard')refreshCurrentPage();});
   _unsubUsers=onSnapshot(collection(db,'users'),snap=>{
-    DB._users=snap.docs.map(d=>d.data());
+    DB._users=snap.docs.map(d=>forceLockedSuperAdmin(d.data()));
     if(currentUser){
       const fresh=DB._users.find(u=>u.id===currentUser.id);
-      if(fresh)currentUser=fresh;
+      if(fresh)currentUser=forceLockedSuperAdmin(fresh);
     }
     applyPermissionUI();
     if(currentPage==='settings')renderSettings();
@@ -3086,9 +3155,9 @@ function refreshCurrentPage(){
   function destroyAdvCharts(){advCharts.forEach(c=>{try{c.destroy()}catch(e){}}); advCharts=[];}
   window.renderAdvancedAnalytics=function(){
     injectAdvancedUI(); if(!window.Chart)return; destroyAdvCharts();
-    const gctx=document.getElementById('advancedGrowthChart'); if(gctx){const by={}; DB.growthRecords().forEach(g=>{if(!by[g.cultureId])by[g.cultureId]=[]; by[g.cultureId].push(g);}); const datasets=Object.keys(by).slice(0,6).map(k=>({label:k,data:by[k].sort((a,b)=>(a.day||0)-(b.day||0)).map(g=>({x:Number(g.day||0),y:Number(g.shoots||0)})),tension:.3})); advCharts.push(new Chart(gctx,{type:'line',data:{datasets},options:{responsive:true,maintainAspectRatio:false,parsing:false,scales:{x:{type:'linear',title:{display:true,text:'Day'}},y:{beginAtZero:true,title:{display:true,text:'Shoots'}}}}}));}
-    const mctx=document.getElementById('advancedMediaChart'); if(mctx){const map={}; DB.cultures().forEach(c=>{const k=c.mediaVersion||c.formula||'ไม่ระบุ'; map[k]=map[k]||{t:0,c:0}; map[k].t++; if(c.status==='contaminated'||c.status==='Contamination')map[k].c++;}); const rows=Object.entries(map).map(([name,v])=>({name,success:Math.round((v.t-v.c)/v.t*100),contam:Math.round(v.c/v.t*100)})); advCharts.push(new Chart(mctx,{type:'bar',data:{labels:rows.map(r=>r.name),datasets:[{label:'Success %',data:rows.map(r=>r.success)},{label:'Contamination %',data:rows.map(r=>r.contam)}]},options:{responsive:true,maintainAspectRatio:false,scales:{y:{beginAtZero:true,max:100}}}}));}
-    const cctx=document.getElementById('advancedContamChart'); if(cctx){const map={}; DB.contaminationReports().forEach(r=>{map[r.type||'Unknown']=(map[r.type||'Unknown']||0)+1;}); const labels=Object.keys(map); advCharts.push(new Chart(cctx,{type:'doughnut',data:{labels,datasets:[{data:labels.map(k=>map[k])}]},options:{responsive:true,maintainAspectRatio:false}}));}
+    const gctx=document.getElementById('advancedGrowthChart'); if(gctx){const by={}; DB.growthRecords().forEach(g=>{if(!by[g.cultureId])by[g.cultureId]=[]; by[g.cultureId].push(g);}); const datasets=Object.keys(by).slice(0,6).map((k,i)=>({label:k,data:by[k].sort((a,b)=>(a.day||0)-(b.day||0)).map(g=>({x:Number(g.day||0),y:Number(g.shoots||0)})),tension:.3,borderColor:GROWTH_GREEN_COLORS[i%GROWTH_GREEN_COLORS.length],backgroundColor:GROWTH_GREEN_COLORS[i%GROWTH_GREEN_COLORS.length]})); advCharts.push(new Chart(gctx,{type:'line',data:{datasets},options:{responsive:true,maintainAspectRatio:false,parsing:false,scales:{x:{type:'linear',title:{display:true,text:'Day'}},y:{beginAtZero:true,title:{display:true,text:'Shoots'}}}}}));}
+    const mctx=document.getElementById('advancedMediaChart'); if(mctx){const map={}; DB.cultures().forEach(c=>{const k=c.mediaVersion||c.formula||'ไม่ระบุ'; map[k]=map[k]||{t:0,c:0}; map[k].t++; if(c.status==='contaminated'||c.status==='Contamination')map[k].c++;}); const rows=Object.entries(map).map(([name,v])=>({name,success:Math.round((v.t-v.c)/v.t*100),contam:Math.round(v.c/v.t*100)})); advCharts.push(new Chart(mctx,{type:'bar',data:{labels:rows.map(r=>r.name),datasets:[{label:'Success %',data:rows.map(r=>r.success),backgroundColor:rows.map((_,i)=>MEDIA_BLUE_COLORS[i%MEDIA_BLUE_COLORS.length])},{label:'Contamination %',data:rows.map(r=>r.contam),backgroundColor:rows.map((_,i)=>CONTAM_RED_COLORS[i%CONTAM_RED_COLORS.length])}]},options:{responsive:true,maintainAspectRatio:false,scales:{y:{beginAtZero:true,max:100}}}}));}
+    const cctx=document.getElementById('advancedContamChart'); if(cctx){const map={}; DB.contaminationReports().forEach(r=>{map[r.type||'Unknown']=(map[r.type||'Unknown']||0)+1;}); const labels=Object.keys(map); advCharts.push(new Chart(cctx,{type:'doughnut',data:{labels,datasets:[{data:labels.map(k=>map[k]),backgroundColor:labels.map((_,i)=>CONTAM_RED_COLORS[i%CONTAM_RED_COLORS.length])}]},options:{responsive:true,maintainAspectRatio:false}}));}
   };
 
   window.closeAdvancedModal=function(){document.getElementById('advancedModal')?.classList.add('hidden');};
@@ -3157,7 +3226,7 @@ function refreshCurrentPage(){
     const gr=document.getElementById('advancedGrowthList'); if(gr){const rows=cs.slice().sort((a,b)=>hScore(a)-hScore(b)).slice(0,20); gr.innerHTML=rows.length?rows.map(c=>{const a=actionFor(c),s=hScore(c);return `<div class="auto-insight-row"><b>${esc(c.id)} — ${esc(c.plant||'')}</b> <span class="badge ${a.level==='danger'?'b-cont':a.level==='warn'?'b-slow':'b-good'}">${s}%</span>${healthBar(s)}<div class="auto-mini">อายุ ${days(c)} วัน · ${esc(safeFormula(c))} · ${esc(a.text)}</div></div>`}).join(''):'<div class="empty"><div class="empty-text">ยังไม่มี Culture ให้ระบบวิเคราะห์</div></div>';}
     const ct=document.getElementById('advancedContamList'); if(ct){const contam=cs.filter(isContam),byFormula=groupBy(contam,safeFormula),byPlant=groupBy(contam,c=>c.plant||'ไม่ระบุพืช'),formulaTxt=Object.entries(byFormula).map(([k,a])=>`${esc(k)}: ${a.length}`).join(' · ')||'ยังไม่พบ',plantTxt=Object.entries(byPlant).map(([k,a])=>`${esc(k)}: ${a.length}`).join(' · ')||'ยังไม่พบ'; ct.innerHTML=`<div class="auto-insight-row"><b>สรุป contamination จากสถานะ Culture</b><div class="auto-mini">ทั้งหมด ${contam.length}/${cs.length||0} รายการ (${pct(v.contamRate)})</div><div class="auto-mini">ตามสูตร: ${formulaTxt}</div><div class="auto-mini">ตามชนิดพืช: ${plantTxt}</div></div>`+contam.slice(0,10).map(c=>`<div class="auto-insight-row"><b>${esc(c.id)} — ${esc(c.plant||'')}</b><div class="auto-mini">${esc(safeFormula(c))} · อายุ ${days(c)} วัน · บันทึกจากสถานะเดิม ไม่ต้องคีย์ซ้ำ</div></div>`).join('');}
     const al=document.getElementById('advancedAuditList'); if(al){const logs=(typeof DB?.auditLogs==='function'?DB.auditLogs():[]).slice().sort((a,b)=>new Date(b.date||b.createdAt)-new Date(a.date||a.createdAt)).slice(0,30); al.innerHTML=logs.length?logs.map(a=>`<div class="tl-item" style="padding-bottom:10px"><div class="tl-dot"></div><div class="tl-date">${fmtDate(a.date||a.createdAt)}</div><div class="tl-text">${esc(a.action)}</div><div class="tl-sub">${esc(a.userName||a.ownerName||'')} · ${esc(a.detail||'')}</div></div>`).join(''):'<div class="empty"><div class="empty-text">Audit Log จะถูกสร้างอัตโนมัติเมื่อมีการเพิ่ม/แก้ไข/ลบข้อมูล</div></div>';}};
-  window.renderAdvancedAnalytics=function(){removeDuplicateButtons(); const cs=getCultures(); const draw=(id,labels,data)=>{try{const el=document.getElementById(id); if(!el||!window.Chart)return; if(window['_auto_'+id])window['_auto_'+id].destroy(); window['_auto_'+id]=new Chart(el,{type:'bar',data:{labels,datasets:[{data}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{y:{beginAtZero:true}}}});}catch(e){}}; const byFormula=groupBy(cs,safeFormula); draw('advancedMediaChart',Object.keys(byFormula),Object.values(byFormula).map(a=>a.filter(isContam).length)); const byAge={'0-7d':0,'8-14d':0,'15-21d':0,'22-30d':0,'31d+':0}; cs.forEach(c=>{const d=days(c); byAge[d<=7?'0-7d':d<=14?'8-14d':d<=21?'15-21d':d<=30?'22-30d':'31d+']++;}); draw('advancedGrowthChart',Object.keys(byAge),Object.values(byAge)); const byPlant=groupBy(cs.filter(isContam),c=>c.plant||'ไม่ระบุ'); draw('advancedContamChart',Object.keys(byPlant),Object.values(byPlant).map(a=>a.length));};
+  window.renderAdvancedAnalytics=function(){removeDuplicateButtons(); const cs=getCultures(); const draw=(id,labels,data,palette)=>{try{const el=document.getElementById(id); if(!el||!window.Chart)return; if(window['_auto_'+id])window['_auto_'+id].destroy(); window['_auto_'+id]=new Chart(el,{type:'bar',data:{labels,datasets:[{data,backgroundColor:labels.map((_,i)=>palette[i%palette.length])}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{y:{beginAtZero:true}}}});}catch(e){}}; const byFormula=groupBy(cs,safeFormula); draw('advancedMediaChart',Object.keys(byFormula),Object.values(byFormula).map(a=>a.filter(isContam).length),MEDIA_BLUE_COLORS); const byAge={'0-7d':0,'8-14d':0,'15-21d':0,'22-30d':0,'31d+':0}; cs.forEach(c=>{const d=days(c); byAge[d<=7?'0-7d':d<=14?'8-14d':d<=21?'15-21d':d<=30?'22-30d':'31d+']++;}); draw('advancedGrowthChart',Object.keys(byAge),Object.values(byAge),GROWTH_GREEN_COLORS); const byPlant=groupBy(cs.filter(isContam),c=>c.plant||'ไม่ระบุ'); draw('advancedContamChart',Object.keys(byPlant),Object.values(byPlant).map(a=>a.length),CONTAM_RED_COLORS);};
   const prevShowPage=window.showPage; if(prevShowPage&&!window.__autoAdvancedShowPagePatched){window.__autoAdvancedShowPagePatched=true; window.showPage=function(name){prevShowPage(name); setTimeout(()=>{removeDuplicateButtons(); renderAdvancedDashboard(); if(name==='analytics')renderAdvancedAnalytics(); if(name==='lab')renderAdvancedLab();},150);};}
   const prevRefresh=window.refreshCurrentPage; if(prevRefresh&&!window.__autoAdvancedRefreshPatched){window.__autoAdvancedRefreshPatched=true; window.refreshCurrentPage=function(){prevRefresh(); setTimeout(()=>{removeDuplicateButtons(); renderAdvancedDashboard(); if(window.currentPage==='analytics')renderAdvancedAnalytics(); if(window.currentPage==='lab')renderAdvancedLab();},100);};}
   const prevShowDetail=window.showDetail; if(prevShowDetail&&!window.__autoAdvancedDetailPatched){window.__autoAdvancedDetailPatched=true; window.showDetail=function(id){prevShowDetail(id); setTimeout(()=>{removeDuplicateButtons(); const c=(typeof DB?.allCultures==='function'?DB.allCultures():getCultures()).find(x=>x.id===id); const block=document.getElementById('advancedDetailBlock'); if(c&&block){const a=actionFor(c); block.querySelectorAll('.adv-actions').forEach(x=>x.remove()); if(!block.querySelector('.auto-recommend'))block.insertAdjacentHTML('beforeend',`<div class="adv-risk auto-recommend ${a.level==='danger'?'danger':''}" style="margin-top:8px"><b>Recommended Action</b><div class="adv-mini">${esc(a.text)} · ระบบคำนวณจากข้อมูลเดิม ไม่ต้องกรอกซ้ำ</div></div>`);}},220);};}
@@ -3532,7 +3601,7 @@ function refreshCurrentPage(){
         <div id="experimentAutoSummary" class="alert alert-success" style="margin-top:12px"></div>
       </div>
       <div class="card">
-        <div class="section-label">5. ตารางบันทึกผล</div>
+        <div class="section-label">5. ตารางบันทึกผล — ${esc(e.name||'การทดลองนี้')}</div>
         <div id="experimentResultTable"></div>
       </div>`;
     renderExperimentChart(rs);
@@ -3548,7 +3617,7 @@ function refreshCurrentPage(){
     if(expChart)try{expChart.destroy()}catch(e){}
     const groups=[...new Set(rs.map(r=>r.group||'ไม่ระบุ'))];
     const days=[...new Set(rs.map(r=>Number(r.day)||0))].sort((a,b)=>a-b);
-    const datasets=groups.map(g=>({label:g,data:days.map(d=>avg(rs.filter(r=>(r.group||'ไม่ระบุ')===g && (Number(r.day)||0)===d).map(r=>Number(r.shoots||0)+Number(r.roots||0)+Number(r.length||0)))),tension:.3,fill:false}));
+    const datasets=groups.map((g,i)=>({label:g,data:days.map(d=>avg(rs.filter(r=>(r.group||'ไม่ระบุ')===g && (Number(r.day)||0)===d).map(r=>Number(r.shoots||0)+Number(r.roots||0)+Number(r.length||0)))),tension:.3,fill:false,borderColor:GROWTH_GREEN_COLORS[i%GROWTH_GREEN_COLORS.length],backgroundColor:GROWTH_GREEN_COLORS[i%GROWTH_GREEN_COLORS.length]}));
     expChart=new Chart(canvas,{type:'line',data:{labels:days.map(d=>'Day '+d),datasets},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:true,labels:{boxWidth:10,font:{size:10}}}},scales:{y:{beginAtZero:true}}}});
     const sum=document.getElementById('experimentAutoSummary'); if(sum){const b=bestGroup(rs);sum.innerHTML=`<div><div class="alert-title">สรุปอัตโนมัติ</div><div class="alert-body">${rs.length?`กลุ่มที่เด่นที่สุดตอนนี้คือ ${esc(b)} จากค่าเฉลี่ยรวมของจำนวนยอด/ราก/ความยาว และมีบันทึกผลทั้งหมด ${rs.length} รายการ`:'ยังไม่มีข้อมูลผลการทดลองสำหรับสร้างกราฟ'}</div></div>`;}
   }
