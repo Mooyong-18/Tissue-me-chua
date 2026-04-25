@@ -1597,34 +1597,6 @@ function renderCompareGrowth(){
 }
 
 // ──────────────────────────────────────────────
-// CHART COLOR PALETTES (PRO UI)
-// ──────────────────────────────────────────────
-const TMC_DISTINCT_CHART_COLORS=[
-  '#2D6A4F', // green
-  '#2563EB', // blue
-  '#F97316', // orange
-  '#7C3AED', // purple
-  '#DC2626', // red
-  '#0891B2', // cyan
-  '#A16207', // amber/brown
-  '#475569', // slate
-  '#DB2777', // pink
-  '#16A34A', // bright green
-  '#4F46E5', // indigo
-  '#EA580C'  // deep orange
-];
-const TMC_GROWTH_GREEN_SHADES=['#D8F3DC','#B7E4C7','#95D5B2','#74C69D','#52B788','#40916C','#2D6A4F','#1B4332'];
-const TMC_CONTAM_RED='#DC2626';
-const TMC_CONTAM_RED_DARK='#991B1B';
-const TMC_CONTAM_RED_SOFT='rgba(220,38,38,.16)';
-function tmcColorArray(labels,palette=TMC_DISTINCT_CHART_COLORS){
-  return (labels||[]).map((_,i)=>palette[i%palette.length]);
-}
-function tmcGreenShades(count){
-  return Array.from({length:Math.max(count||0,1)},(_,i)=>TMC_GROWTH_GREEN_SHADES[i%TMC_GROWTH_GREEN_SHADES.length]);
-}
-
-// ──────────────────────────────────────────────
 // ANALYTICS
 // ──────────────────────────────────────────────
 let analyticsCharts=[];
@@ -1676,7 +1648,7 @@ function renderAnalytics(){
   const pData=pLabels.map(p=>plantMap[p]);
   const ctx2=document.getElementById('plantChart');
   if(ctx2){
-    analyticsCharts.push(new Chart(ctx2,{type:'doughnut',data:{labels:pLabels,datasets:[{data:pData,backgroundColor:tmcColorArray(pLabels)}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'right',labels:{font:{size:10},boxWidth:10}}}}}));
+    analyticsCharts.push(new Chart(ctx2,{type:'doughnut',data:{labels:pLabels,datasets:[{data:pData,backgroundColor:['#2d6a4f','#40916c','#52b788','#74c69d','#95d5b2','#b7e4c7','#d8f3dc','#1b4332']}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'right',labels:{font:{size:10},boxWidth:10}}}}}));
   }
 
   // Contamination over time
@@ -1688,7 +1660,7 @@ function renderAnalytics(){
   const mKeys=Object.keys(contByMonth).sort().slice(-6);
   const ctx3=document.getElementById('contChart');
   if(ctx3){
-    analyticsCharts.push(new Chart(ctx3,{type:'bar',data:{labels:mKeys,datasets:[{label:'Contamination',data:mKeys.map(k=>contByMonth[k]),backgroundColor:TMC_CONTAM_RED,borderColor:TMC_CONTAM_RED_DARK,borderWidth:1,borderRadius:8}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{backgroundColor:'#263238',titleColor:'#fff',bodyColor:'#fff',padding:10}},scales:{y:{beginAtZero:true,ticks:{stepSize:1,font:{size:10}}},x:{ticks:{font:{size:10}}}}}}));
+    analyticsCharts.push(new Chart(ctx3,{type:'line',data:{labels:mKeys,datasets:[{label:'Contamination',data:mKeys.map(k=>contByMonth[k]),borderColor:'#b91c1c',backgroundColor:'rgba(185,28,28,.1)',tension:.3,fill:true,pointRadius:4}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{y:{beginAtZero:true,ticks:{stepSize:1,font:{size:10}}},x:{ticks:{font:{size:10}}}}}}));
   }
 
   // Growth summary
@@ -2151,11 +2123,14 @@ function showDetail(id){
     html+=`<div style="font-size:12px;color:var(--text3)">ยังไม่มีประวัติอัพเดต</div>`;
   }
 
-  const isAdmin=currentUser&&currentUser.role==='admin';
-  html+=`<div style="margin-top:16px;display:flex;flex-direction:column;gap:8px">
+  // Show edit/delete buttons based on permission, not only role==='admin'.
+  // This prevents Super Admin from losing the buttons in the detail page.
+  const canEditThis=!!(currentUser&&(currentUser.superadmin||currentUser.role==='admin'||canEditItem(c,'cultures')));
+  const canDeleteThis=!!(currentUser&&(currentUser.superadmin||currentUser.role==='admin'||(can('deleteCultures')&&canEditItem(c,'cultures'))));
+  html+=`<div style="margin-top:16px;display:flex;flex-direction:column;gap:8px;padding-bottom:12px">
     <button class="btn btn-primary" onclick="openUpdateModal('${c.id}')">อัพเดตสถานะ</button>
-    ${isAdmin?`<button class="btn btn-secondary" onclick="editCulture('${c.id}')">แก้ไขข้อมูล</button>
-    <button class="btn btn-danger" onclick="deleteCulture('${c.id}')">ลบ Culture นี้</button>`:''}
+    ${canEditThis?`<button class="btn btn-secondary" onclick="editCulture('${c.id}')">แก้ไขข้อมูล</button>`:''}
+    ${canDeleteThis?`<button class="btn btn-danger" onclick="deleteCulture('${c.id}')">ลบ Culture นี้</button>`:''}
   </div>`;
 
   document.getElementById('detailContent').innerHTML=html;
@@ -2167,10 +2142,10 @@ function showDetail(id){
     setTimeout(()=>{
       const ctx=document.getElementById('growthChart');
       if(ctx){
-        new Chart(ctx,{type:'bar',data:{labels:growthData.map(u=>formatDateShort(u.date)),datasets:[
-          {label:'ความยาวต้น (cm)',data:growthData.map(u=>u.shootLen||0),backgroundColor:tmcGreenShades(growthData.length),borderColor:'#2D6A4F',borderWidth:1,borderRadius:8},
-          {label:'ความยาวราก (cm)',data:growthData.map(u=>u.rootLen||0),backgroundColor:tmcGreenShades(growthData.length).reverse(),borderColor:'#1B4332',borderWidth:1,borderRadius:8}
-        ]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{labels:{font:{size:11},boxWidth:12}},tooltip:{backgroundColor:'#263238',titleColor:'#fff',bodyColor:'#fff',padding:10}},scales:{y:{beginAtZero:true,ticks:{font:{size:10}}},x:{ticks:{font:{size:10}}}}}});
+        new Chart(ctx,{type:'line',data:{labels:growthData.map(u=>formatDateShort(u.date)),datasets:[
+          {label:'ความยาวต้น (cm)',data:growthData.map(u=>u.shootLen||0),borderColor:'#40916c',backgroundColor:'rgba(64,145,108,.1)',tension:.3,fill:true,pointRadius:4},
+          {label:'ความยาวราก (cm)',data:growthData.map(u=>u.rootLen||0),borderColor:'#b45309',backgroundColor:'rgba(180,83,9,.1)',tension:.3,fill:true,pointRadius:4}
+        ]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{labels:{font:{size:11},boxWidth:12}}},scales:{y:{beginAtZero:true,ticks:{font:{size:10}}},x:{ticks:{font:{size:10}}}}}});
       }
     },100);
   }
@@ -3111,7 +3086,7 @@ function refreshCurrentPage(){
   function destroyAdvCharts(){advCharts.forEach(c=>{try{c.destroy()}catch(e){}}); advCharts=[];}
   window.renderAdvancedAnalytics=function(){
     injectAdvancedUI(); if(!window.Chart)return; destroyAdvCharts();
-    const gctx=document.getElementById('advancedGrowthChart'); if(gctx){const byDay={}; DB.growthRecords().forEach(g=>{const d=String(g.day||0); byDay[d]=(byDay[d]||0)+Number(g.shoots||0);}); const labels=Object.keys(byDay).sort((a,b)=>Number(a)-Number(b)); advCharts.push(new Chart(gctx,{type:'bar',data:{labels:labels.map(d=>'Day '+d),datasets:[{label:'Shoots',data:labels.map(d=>byDay[d]),backgroundColor:tmcGreenShades(labels.length),borderColor:'#2D6A4F',borderWidth:1,borderRadius:8}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{backgroundColor:'#263238',titleColor:'#fff',bodyColor:'#fff',padding:10}},scales:{y:{beginAtZero:true,title:{display:true,text:'Shoots'}},x:{ticks:{font:{size:10}}}}}}));}
+    const gctx=document.getElementById('advancedGrowthChart'); if(gctx){const by={}; DB.growthRecords().forEach(g=>{if(!by[g.cultureId])by[g.cultureId]=[]; by[g.cultureId].push(g);}); const datasets=Object.keys(by).slice(0,6).map(k=>({label:k,data:by[k].sort((a,b)=>(a.day||0)-(b.day||0)).map(g=>({x:Number(g.day||0),y:Number(g.shoots||0)})),tension:.3})); advCharts.push(new Chart(gctx,{type:'line',data:{datasets},options:{responsive:true,maintainAspectRatio:false,parsing:false,scales:{x:{type:'linear',title:{display:true,text:'Day'}},y:{beginAtZero:true,title:{display:true,text:'Shoots'}}}}}));}
     const mctx=document.getElementById('advancedMediaChart'); if(mctx){const map={}; DB.cultures().forEach(c=>{const k=c.mediaVersion||c.formula||'ไม่ระบุ'; map[k]=map[k]||{t:0,c:0}; map[k].t++; if(c.status==='contaminated'||c.status==='Contamination')map[k].c++;}); const rows=Object.entries(map).map(([name,v])=>({name,success:Math.round((v.t-v.c)/v.t*100),contam:Math.round(v.c/v.t*100)})); advCharts.push(new Chart(mctx,{type:'bar',data:{labels:rows.map(r=>r.name),datasets:[{label:'Success %',data:rows.map(r=>r.success)},{label:'Contamination %',data:rows.map(r=>r.contam)}]},options:{responsive:true,maintainAspectRatio:false,scales:{y:{beginAtZero:true,max:100}}}}));}
     const cctx=document.getElementById('advancedContamChart'); if(cctx){const map={}; DB.contaminationReports().forEach(r=>{map[r.type||'Unknown']=(map[r.type||'Unknown']||0)+1;}); const labels=Object.keys(map); advCharts.push(new Chart(cctx,{type:'doughnut',data:{labels,datasets:[{data:labels.map(k=>map[k])}]},options:{responsive:true,maintainAspectRatio:false}}));}
   };
@@ -3182,7 +3157,7 @@ function refreshCurrentPage(){
     const gr=document.getElementById('advancedGrowthList'); if(gr){const rows=cs.slice().sort((a,b)=>hScore(a)-hScore(b)).slice(0,20); gr.innerHTML=rows.length?rows.map(c=>{const a=actionFor(c),s=hScore(c);return `<div class="auto-insight-row"><b>${esc(c.id)} — ${esc(c.plant||'')}</b> <span class="badge ${a.level==='danger'?'b-cont':a.level==='warn'?'b-slow':'b-good'}">${s}%</span>${healthBar(s)}<div class="auto-mini">อายุ ${days(c)} วัน · ${esc(safeFormula(c))} · ${esc(a.text)}</div></div>`}).join(''):'<div class="empty"><div class="empty-text">ยังไม่มี Culture ให้ระบบวิเคราะห์</div></div>';}
     const ct=document.getElementById('advancedContamList'); if(ct){const contam=cs.filter(isContam),byFormula=groupBy(contam,safeFormula),byPlant=groupBy(contam,c=>c.plant||'ไม่ระบุพืช'),formulaTxt=Object.entries(byFormula).map(([k,a])=>`${esc(k)}: ${a.length}`).join(' · ')||'ยังไม่พบ',plantTxt=Object.entries(byPlant).map(([k,a])=>`${esc(k)}: ${a.length}`).join(' · ')||'ยังไม่พบ'; ct.innerHTML=`<div class="auto-insight-row"><b>สรุป contamination จากสถานะ Culture</b><div class="auto-mini">ทั้งหมด ${contam.length}/${cs.length||0} รายการ (${pct(v.contamRate)})</div><div class="auto-mini">ตามสูตร: ${formulaTxt}</div><div class="auto-mini">ตามชนิดพืช: ${plantTxt}</div></div>`+contam.slice(0,10).map(c=>`<div class="auto-insight-row"><b>${esc(c.id)} — ${esc(c.plant||'')}</b><div class="auto-mini">${esc(safeFormula(c))} · อายุ ${days(c)} วัน · บันทึกจากสถานะเดิม ไม่ต้องคีย์ซ้ำ</div></div>`).join('');}
     const al=document.getElementById('advancedAuditList'); if(al){const logs=(typeof DB?.auditLogs==='function'?DB.auditLogs():[]).slice().sort((a,b)=>new Date(b.date||b.createdAt)-new Date(a.date||a.createdAt)).slice(0,30); al.innerHTML=logs.length?logs.map(a=>`<div class="tl-item" style="padding-bottom:10px"><div class="tl-dot"></div><div class="tl-date">${fmtDate(a.date||a.createdAt)}</div><div class="tl-text">${esc(a.action)}</div><div class="tl-sub">${esc(a.userName||a.ownerName||'')} · ${esc(a.detail||'')}</div></div>`).join(''):'<div class="empty"><div class="empty-text">Audit Log จะถูกสร้างอัตโนมัติเมื่อมีการเพิ่ม/แก้ไข/ลบข้อมูล</div></div>';}};
-  window.renderAdvancedAnalytics=function(){removeDuplicateButtons(); const cs=getCultures(); const draw=(id,labels,data,mode='distinct')=>{try{const el=document.getElementById(id); if(!el||!window.Chart)return; if(window['_auto_'+id])window['_auto_'+id].destroy(); const bg=mode==='green'?tmcGreenShades(labels.length):mode==='red'?TMC_CONTAM_RED:tmcColorArray(labels); const border=mode==='red'?TMC_CONTAM_RED_DARK:(mode==='green'?'#2D6A4F':'rgba(0,0,0,.08)'); window['_auto_'+id]=new Chart(el,{type:'bar',data:{labels,datasets:[{data,backgroundColor:bg,borderColor:border,borderWidth:1,borderRadius:8}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{backgroundColor:'#263238',titleColor:'#fff',bodyColor:'#fff',padding:10}},scales:{y:{beginAtZero:true}}}});}catch(e){}}; const byFormula=groupBy(cs,safeFormula); draw('advancedMediaChart',Object.keys(byFormula),Object.values(byFormula).map(a=>a.filter(isContam).length),'distinct'); const byAge={'0-7d':0,'8-14d':0,'15-21d':0,'22-30d':0,'31d+':0}; cs.forEach(c=>{const d=days(c); byAge[d<=7?'0-7d':d<=14?'8-14d':d<=21?'15-21d':d<=30?'22-30d':'31d+']++;}); draw('advancedGrowthChart',Object.keys(byAge),Object.values(byAge),'green'); const byPlant=groupBy(cs.filter(isContam),c=>c.plant||'ไม่ระบุ'); draw('advancedContamChart',Object.keys(byPlant),Object.values(byPlant).map(a=>a.length),'red');};
+  window.renderAdvancedAnalytics=function(){removeDuplicateButtons(); const cs=getCultures(); const draw=(id,labels,data)=>{try{const el=document.getElementById(id); if(!el||!window.Chart)return; if(window['_auto_'+id])window['_auto_'+id].destroy(); window['_auto_'+id]=new Chart(el,{type:'bar',data:{labels,datasets:[{data}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{y:{beginAtZero:true}}}});}catch(e){}}; const byFormula=groupBy(cs,safeFormula); draw('advancedMediaChart',Object.keys(byFormula),Object.values(byFormula).map(a=>a.filter(isContam).length)); const byAge={'0-7d':0,'8-14d':0,'15-21d':0,'22-30d':0,'31d+':0}; cs.forEach(c=>{const d=days(c); byAge[d<=7?'0-7d':d<=14?'8-14d':d<=21?'15-21d':d<=30?'22-30d':'31d+']++;}); draw('advancedGrowthChart',Object.keys(byAge),Object.values(byAge)); const byPlant=groupBy(cs.filter(isContam),c=>c.plant||'ไม่ระบุ'); draw('advancedContamChart',Object.keys(byPlant),Object.values(byPlant).map(a=>a.length));};
   const prevShowPage=window.showPage; if(prevShowPage&&!window.__autoAdvancedShowPagePatched){window.__autoAdvancedShowPagePatched=true; window.showPage=function(name){prevShowPage(name); setTimeout(()=>{removeDuplicateButtons(); renderAdvancedDashboard(); if(name==='analytics')renderAdvancedAnalytics(); if(name==='lab')renderAdvancedLab();},150);};}
   const prevRefresh=window.refreshCurrentPage; if(prevRefresh&&!window.__autoAdvancedRefreshPatched){window.__autoAdvancedRefreshPatched=true; window.refreshCurrentPage=function(){prevRefresh(); setTimeout(()=>{removeDuplicateButtons(); renderAdvancedDashboard(); if(window.currentPage==='analytics')renderAdvancedAnalytics(); if(window.currentPage==='lab')renderAdvancedLab();},100);};}
   const prevShowDetail=window.showDetail; if(prevShowDetail&&!window.__autoAdvancedDetailPatched){window.__autoAdvancedDetailPatched=true; window.showDetail=function(id){prevShowDetail(id); setTimeout(()=>{removeDuplicateButtons(); const c=(typeof DB?.allCultures==='function'?DB.allCultures():getCultures()).find(x=>x.id===id); const block=document.getElementById('advancedDetailBlock'); if(c&&block){const a=actionFor(c); block.querySelectorAll('.adv-actions').forEach(x=>x.remove()); if(!block.querySelector('.auto-recommend'))block.insertAdjacentHTML('beforeend',`<div class="adv-risk auto-recommend ${a.level==='danger'?'danger':''}" style="margin-top:8px"><b>Recommended Action</b><div class="adv-mini">${esc(a.text)} · ระบบคำนวณจากข้อมูลเดิม ไม่ต้องกรอกซ้ำ</div></div>`);}},220);};}
