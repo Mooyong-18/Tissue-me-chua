@@ -2123,11 +2123,14 @@ function showDetail(id){
     html+=`<div style="font-size:12px;color:var(--text3)">ยังไม่มีประวัติอัพเดต</div>`;
   }
 
-  const isAdmin=currentUser&&currentUser.role==='admin';
-  html+=`<div style="margin-top:16px;display:flex;flex-direction:column;gap:8px">
+  // Show edit/delete buttons based on permission, not only role==='admin'.
+  // This prevents Super Admin from losing the buttons in the detail page.
+  const canEditThis=!!(currentUser&&(currentUser.superadmin||currentUser.role==='admin'||canEditItem(c,'cultures')));
+  const canDeleteThis=!!(currentUser&&(currentUser.superadmin||currentUser.role==='admin'||(can('deleteCultures')&&canEditItem(c,'cultures'))));
+  html+=`<div style="margin-top:16px;display:flex;flex-direction:column;gap:8px;padding-bottom:12px">
     <button class="btn btn-primary" onclick="openUpdateModal('${c.id}')">อัพเดตสถานะ</button>
-    ${isAdmin?`<button class="btn btn-secondary" onclick="editCulture('${c.id}')">แก้ไขข้อมูล</button>
-    <button class="btn btn-danger" onclick="deleteCulture('${c.id}')">ลบ Culture นี้</button>`:''}
+    ${canEditThis?`<button class="btn btn-secondary" onclick="editCulture('${c.id}')">แก้ไขข้อมูล</button>`:''}
+    ${canDeleteThis?`<button class="btn btn-danger" onclick="deleteCulture('${c.id}')">ลบ Culture นี้</button>`:''}
   </div>`;
 
   document.getElementById('detailContent').innerHTML=html;
