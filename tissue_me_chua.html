@@ -3329,6 +3329,10 @@ function refreshCurrentPage(){
       .exp-pill{display:inline-flex;align-items:center;gap:4px;padding:3px 8px;border-radius:99px;background:var(--bg2);font-size:10px;color:var(--text2);margin:2px 4px 2px 0}
       .exp-result-row{background:var(--card);border:1px solid var(--border);border-radius:var(--radius-sm);padding:10px;margin-top:8px}
       .exp-img-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-top:8px}
+      .exp-photo-item{position:relative;aspect-ratio:1;border-radius:8px;overflow:hidden;border:1px solid var(--border);background:var(--bg2)}
+      .exp-photo-item img{width:100%;height:100%;object-fit:cover;display:block}
+      .exp-photo-remove{position:absolute;top:4px;right:4px;width:24px;height:24px;border-radius:50%;background:rgba(185,28,28,.92);color:#fff;font-size:16px;line-height:24px;text-align:center;box-shadow:0 1px 4px rgba(0,0,0,.25);z-index:2}
+      .exp-photo-remove:active{transform:scale(.94)}
       .exp-thumb{aspect-ratio:1;border-radius:8px;object-fit:cover;border:1px solid var(--border);background:var(--bg2);width:100%}
       .exp-table{width:100%;border-collapse:collapse;font-size:11px;background:var(--card);border-radius:var(--radius-sm);overflow:hidden}
       .exp-table th,.exp-table td{border-bottom:1px solid var(--border);padding:7px 6px;text-align:left;vertical-align:top}
@@ -3596,16 +3600,42 @@ function refreshCurrentPage(){
     document.getElementById('res_length').value=r?.length||'';
     document.getElementById('res_status').value=r?.status||'Normal';
     document.getElementById('res_note').value=r?.note||'';
-    document.getElementById('res_photoPreview').innerHTML=(r?.photos||[]).map(p=>`<img class="exp-thumb" src="${p}">`).join('');
     document.getElementById('res_photos').value='';
-    window.__resExistingPhotos=r?.photos||[];
+    window.__resExistingPhotos=[...(r?.photos||[])];
+    window.__resNewPhotos=[];
+    renderExperimentPhotoPreview();
     document.getElementById('experimentResultModal').classList.remove('hidden');
   };
+
+  function renderExperimentPhotoPreview(){
+    const box=document.getElementById('res_photoPreview');
+    if(!box)return;
+    const oldPhotos=(window.__resExistingPhotos||[]).map((p,i)=>({src:p,type:'old',index:i}));
+    const newPhotos=(window.__resNewPhotos||[]).map((p,i)=>({src:p,type:'new',index:i}));
+    const photos=[...oldPhotos,...newPhotos];
+    box.innerHTML=photos.length?photos.map(p=>`
+      <div class="exp-photo-item">
+        <button type="button" class="exp-photo-remove" onclick="removeExperimentPhoto('${p.type}',${p.index})">×</button>
+        <img src="${p.src}" onclick="openLightbox&&openLightbox('${p.src}')">
+      </div>`).join(''):`<div style="font-size:11px;color:var(--text3);grid-column:1/-1">ยังไม่มีรูปภาพ</div>`;
+  }
+
+  window.removeExperimentPhoto=function(type,index){
+    if(type==='old'){
+      window.__resExistingPhotos=(window.__resExistingPhotos||[]).filter((_,i)=>i!==index);
+    }else{
+      window.__resNewPhotos=(window.__resNewPhotos||[]).filter((_,i)=>i!==index);
+      const input=document.getElementById('res_photos');
+      if(input)input.value='';
+    }
+    renderExperimentPhotoPreview();
+  };
+
   window.previewExperimentPhotos=async function(input){
     const files=[...(input.files||[])]; const photos=[];
     for(const f of files){photos.push(await fileToSmallDataUrl(f));}
-    window.__resNewPhotos=photos;
-    document.getElementById('res_photoPreview').innerHTML=[...(window.__resExistingPhotos||[]),...photos].map(p=>`<img class="exp-thumb" src="${p}">`).join('');
+    window.__resNewPhotos=[...(window.__resNewPhotos||[]),...photos];
+    renderExperimentPhotoPreview();
   };
   async function fileToSmallDataUrl(file){
     return new Promise(resolve=>{const img=new Image(); const rd=new FileReader(); rd.onload=e=>{img.onload=()=>{const max=900; let w=img.width,h=img.height; if(Math.max(w,h)>max){if(w>h){h=Math.round(h*max/w);w=max}else{w=Math.round(w*max/h);h=max}} const c=document.createElement('canvas'); c.width=w;c.height=h; c.getContext('2d').drawImage(img,0,0,w,h); resolve(c.toDataURL('image/jpeg',.72));}; img.src=e.target.result;}; rd.readAsDataURL(file);});
