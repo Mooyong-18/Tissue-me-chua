@@ -356,7 +356,7 @@ textarea.inp{resize:vertical;min-height:72px}
       </div>
     </div>
     <div style="display:flex;align-items:center;gap:8px">
-      <div id="notifBell" style="position:relative;cursor:pointer" onclick="showPage('alerts')">
+      <div id="notifBell" style="position:relative;cursor:pointer" onclick="toggleNotificationCenter()">
         <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="var(--text2)" stroke-width="1.7"><path d="M10 2a6 6 0 016 6c0 3 1.5 4 1.5 5H2.5C2.5 12 4 11 4 8a6 6 0 016-6z"/><path d="M8 16a2 2 0 004 0" stroke-linecap="round"/></svg>
         <div id="notifDot" class="hidden" style="position:absolute;top:0;right:0;width:7px;height:7px;background:var(--danger);border-radius:50%;border:1.5px solid var(--card)"></div>
       </div>
@@ -3096,6 +3096,164 @@ function refreshCurrentPage(){
   const prevRefresh=window.refreshCurrentPage; if(prevRefresh&&!window.__autoAdvancedRefreshPatched){window.__autoAdvancedRefreshPatched=true; window.refreshCurrentPage=function(){prevRefresh(); setTimeout(()=>{removeDuplicateButtons(); renderAdvancedDashboard(); if(window.currentPage==='analytics')renderAdvancedAnalytics(); if(window.currentPage==='lab')renderAdvancedLab();},100);};}
   const prevShowDetail=window.showDetail; if(prevShowDetail&&!window.__autoAdvancedDetailPatched){window.__autoAdvancedDetailPatched=true; window.showDetail=function(id){prevShowDetail(id); setTimeout(()=>{removeDuplicateButtons(); const c=(typeof DB?.allCultures==='function'?DB.allCultures():getCultures()).find(x=>x.id===id); const block=document.getElementById('advancedDetailBlock'); if(c&&block){const a=actionFor(c); block.querySelectorAll('.adv-actions').forEach(x=>x.remove()); if(!block.querySelector('.auto-recommend'))block.insertAdjacentHTML('beforeend',`<div class="adv-risk auto-recommend ${a.level==='danger'?'danger':''}" style="margin-top:8px"><b>Recommended Action</b><div class="adv-mini">${esc(a.text)} · ระบบคำนวณจากข้อมูลเดิม ไม่ต้องกรอกซ้ำ</div></div>`);}},220);};}
   document.addEventListener('DOMContentLoaded',()=>setTimeout(()=>{removeDuplicateButtons(); renderAdvancedDashboard(); renderAdvancedLab();},500));
+})();
+</script>
+
+
+<script>
+/* NOTIFICATION CENTER PATCH: move Activity Feed + alerts into the bell menu. */
+(function(){
+  if(window.__notificationCenterPatch)return; window.__notificationCenterPatch=true;
+
+  function esc(s){return String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
+  function fmt(s){try{return typeof formatDateTime==='function'?formatDateTime(s):(typeof formatDate==='function'?formatDate(s):String(s||''));}catch(e){return String(s||'');}}
+  function cultures(){try{return typeof DB?.cultures==='function'?DB.cultures():[]}catch(e){return []}}
+  function isContam(c){return ['contaminated','contamination','Contamination'].includes(c?.status)}
+  function isClosed(c){return ['closed','Closed'].includes(c?.status)||!!c?.closedDate}
+  function daysLeft(c){if(!c?.dueDate)return null; return Math.ceil((new Date(c.dueDate)-new Date())/86400000)}
+  function activity(limit=30){try{if(typeof getActivityFeed==='function')return getActivityFeed(limit)||[]}catch(e){} return []}
+
+  function ensureNotificationCenter(){
+    if(!document.getElementById('notificationCenterStyle')){
+      document.head.insertAdjacentHTML('beforeend',`<style id="notificationCenterStyle">
+        #alertsSection{display:none!important}
+        #labTabs .tab-btn[onclick*="alerts"],#labTab-alerts{display:none!important}
+        .notif-overlay{position:fixed;inset:0;background:rgba(0,0,0,.22);z-index:650;display:flex;align-items:flex-start;justify-content:center;padding-top:58px}
+        .notif-overlay.hidden{display:none!important}
+        .notif-panel{width:calc(100% - 24px);max-width:456px;max-height:78vh;overflow:auto;background:var(--card);border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow-md)}
+        .notif-head{position:sticky;top:0;background:var(--card);z-index:2;padding:12px 14px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;gap:10px}
+        .notif-title{font-size:15px;font-weight:700;color:var(--text)}
+        .notif-sub{font-size:11px;color:var(--text3);margin-top:1px}
+        .notif-close{width:30px;height:30px;border-radius:50%;display:flex;align-items:center;justify-content:center;color:var(--text3);font-size:22px;background:var(--bg)}
+        .notif-tabs{display:flex;gap:6px;padding:10px 12px 0;background:var(--card)}
+        .notif-tab{font-size:11px;padding:5px 10px;border:1px solid var(--border2);border-radius:999px;color:var(--text2);background:var(--bg);cursor:pointer;white-space:nowrap}
+        .notif-tab.active{background:var(--accent);border-color:var(--accent);color:#fff}
+        .notif-body{padding:12px}
+        .notif-item{display:flex;gap:10px;padding:10px 0;border-bottom:1px solid var(--border)}
+        .notif-item:last-child{border-bottom:0}
+        .notif-icon{width:26px;height:26px;border-radius:50%;display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:13px;background:var(--bg2);color:var(--text2)}
+        .notif-item.danger .notif-icon{background:var(--danger-light);color:var(--danger)}
+        .notif-item.warn .notif-icon{background:var(--warn-light);color:var(--warn)}
+        .notif-item.activity .notif-icon{background:var(--info-light);color:var(--info)}
+        .notif-item.success .notif-icon{background:var(--accent-light);color:var(--accent)}
+        .notif-main{min-width:0;flex:1}
+        .notif-item-title{font-size:13px;font-weight:600;color:var(--text);line-height:1.35}
+        .notif-item-body{font-size:11px;color:var(--text2);margin-top:2px;line-height:1.4;word-break:break-word}
+        .notif-time{font-family:'DM Mono',monospace;font-size:10px;color:var(--text3);margin-top:4px}
+        .notif-count{min-width:16px;height:16px;border-radius:8px;background:var(--danger);color:#fff;font-size:9px;font-weight:700;display:flex;align-items:center;justify-content:center;position:absolute;top:-6px;right:-6px;padding:0 4px}
+        #activityFeed{display:none!important}
+      </style>`);
+    }
+    if(!document.getElementById('notificationCenter')){
+      document.body.insertAdjacentHTML('beforeend',`<div id="notificationCenter" class="notif-overlay hidden" onclick="if(event.target===this)closeNotificationCenter()">
+        <div class="notif-panel">
+          <div class="notif-head">
+            <div><div class="notif-title">ศูนย์การแจ้งเตือน</div><div class="notif-sub" id="notifCenterSub">Alerts & Activity Feed</div></div>
+            <button class="notif-close" onclick="closeNotificationCenter()">×</button>
+          </div>
+          <div class="notif-tabs">
+            <button class="notif-tab active" id="notifTabAll" onclick="setNotifFilter('all')">ทั้งหมด</button>
+            <button class="notif-tab" id="notifTabAlerts" onclick="setNotifFilter('alerts')">แจ้งเตือน</button>
+            <button class="notif-tab" id="notifTabActivity" onclick="setNotifFilter('activity')">กิจกรรม</button>
+          </div>
+          <div class="notif-body" id="notificationCenterBody"></div>
+        </div>
+      </div>`);
+    }
+    const feed=document.getElementById('activityFeed');
+    if(feed&&feed.closest('.section'))feed.closest('.section').classList.add('hidden');
+    const alertTab=document.getElementById('labTab-alerts');
+    if(alertTab&&!alertTab.classList.contains('hidden')){
+      const first=document.querySelector('#labTabs .tab-btn');
+      if(typeof switchLabTab==='function')switchLabTab('schedule',first);
+    }
+    addBellCountNode();
+  }
+
+  function addBellCountNode(){
+    const bell=document.getElementById('notifBell'); if(!bell)return;
+    if(!document.getElementById('notifCount'))bell.insertAdjacentHTML('beforeend','<div id="notifCount" class="notif-count hidden">0</div>');
+  }
+
+  function collectNotifications(){
+    const cs=cultures();
+    const items=[];
+    cs.forEach(c=>{
+      const d=daysLeft(c);
+      if(!isClosed(c)&&d!==null&&d<0){
+        items.push({kind:'alert',level:'danger',icon:'!',title:`${c.id} — ${c.plant||''} เลย Due แล้ว`,body:`Due ${typeof formatDate==='function'?formatDate(c.dueDate):c.dueDate} · ${Math.abs(d)} วันที่แล้ว · ${c.formula||''}`,date:c.dueDate||new Date().toISOString(),target:c.id});
+      }else if(!isClosed(c)&&d!==null&&d<=3&&d>=0){
+        items.push({kind:'alert',level:'warn',icon:'!',title:`${c.id} — ${c.plant||''} ใกล้ Due`,body:`ครบ Due ใน ${d} วัน · ${c.formula||''}`,date:c.dueDate||new Date().toISOString(),target:c.id});
+      }
+      if(isContam(c)){
+        items.push({kind:'alert',level:'danger',icon:'×',title:`${c.id} — ${c.plant||''} Contamination`,body:`${c.formula||''}${c.closedDate?' · ปิด '+(typeof formatDate==='function'?formatDate(c.closedDate):c.closedDate):''}`,date:c.closedDate||c.updatedAt||c.startDate||new Date().toISOString(),target:c.id});
+      }
+    });
+    activity(40).forEach(a=>items.push({kind:'activity',level:'activity',icon:'•',title:a.title||'กิจกรรม',body:a.sub||'',date:a.date||new Date().toISOString()}));
+    return items.sort((a,b)=>new Date(b.date||0)-new Date(a.date||0));
+  }
+
+  window.__notifFilter='all';
+  window.setNotifFilter=function(filter){
+    window.__notifFilter=filter;
+    document.querySelectorAll('.notif-tab').forEach(b=>b.classList.remove('active'));
+    const id=filter==='alerts'?'notifTabAlerts':filter==='activity'?'notifTabActivity':'notifTabAll';
+    document.getElementById(id)?.classList.add('active');
+    renderNotificationCenter();
+  };
+
+  window.renderNotificationCenter=function(){
+    ensureNotificationCenter();
+    const items=collectNotifications();
+    const alertCount=items.filter(x=>x.kind==='alert').length;
+    const count=document.getElementById('notifCount');
+    if(count){count.textContent=alertCount>99?'99+':String(alertCount); count.classList.toggle('hidden',alertCount===0);}
+    const dot=document.getElementById('notifDot'); if(dot)dot.classList.toggle('hidden',alertCount===0);
+    const sub=document.getElementById('notifCenterSub'); if(sub)sub.textContent=`${alertCount} แจ้งเตือน · ${items.filter(x=>x.kind==='activity').length} กิจกรรมล่าสุด`;
+    const filter=window.__notifFilter||'all';
+    const shown=items.filter(x=>filter==='all'||(filter==='alerts'?x.kind==='alert':x.kind==='activity'));
+    const body=document.getElementById('notificationCenterBody'); if(!body)return;
+    if(!shown.length){
+      body.innerHTML=`<div class="alert alert-success"><div><div class="alert-title">ไม่มีรายการในหมวดนี้</div><div class="alert-body">ทุกอย่างจะถูกรวมไว้ที่ศูนย์การแจ้งเตือนนี้โดยอัตโนมัติ</div></div></div>`;
+      return;
+    }
+    body.innerHTML=shown.map(n=>`<div class="notif-item ${n.level||''}" ${n.target?`onclick="showDetail('${esc(n.target)}');closeNotificationCenter()" style="cursor:pointer"`:''}>
+      <div class="notif-icon">${esc(n.icon||'•')}</div>
+      <div class="notif-main"><div class="notif-item-title">${esc(n.title)}</div><div class="notif-item-body">${esc(n.body)}</div><div class="notif-time">${fmt(n.date)}</div></div>
+    </div>`).join('');
+  };
+
+  window.toggleNotificationCenter=function(){
+    ensureNotificationCenter(); renderNotificationCenter();
+    document.getElementById('notificationCenter')?.classList.toggle('hidden');
+  };
+  window.closeNotificationCenter=function(){document.getElementById('notificationCenter')?.classList.add('hidden');};
+
+  window.renderAlerts=function(){
+    ensureNotificationCenter();
+    const list=document.getElementById('alertsList');
+    if(list)list.innerHTML=`<div class="alert alert-success"><div><div class="alert-title">ย้ายไปศูนย์การแจ้งเตือนแล้ว</div><div class="alert-body">กดรูปกระดิ่งมุมขวาบนเพื่อดูการแจ้งเตือนทั้งหมด</div></div></div>`;
+    renderNotificationCenter();
+  };
+  window.renderActivityFeed=function(){ensureNotificationCenter(); renderNotificationCenter();};
+
+  const prevShowPage=window.showPage;
+  if(prevShowPage&&!window.__notificationShowPagePatched){
+    window.__notificationShowPagePatched=true;
+    window.showPage=function(name){
+      if(name==='alerts'){toggleNotificationCenter();return;}
+      prevShowPage(name);
+      setTimeout(()=>{ensureNotificationCenter();renderNotificationCenter();},120);
+    };
+  }
+  const prevRefresh=window.refreshCurrentPage;
+  if(prevRefresh&&!window.__notificationRefreshPatched){
+    window.__notificationRefreshPatched=true;
+    window.refreshCurrentPage=function(){prevRefresh();setTimeout(()=>{ensureNotificationCenter();renderNotificationCenter();},120);};
+  }
+
+  document.addEventListener('DOMContentLoaded',()=>setTimeout(()=>{ensureNotificationCenter();renderNotificationCenter();},600));
+  setTimeout(()=>{ensureNotificationCenter();renderNotificationCenter();},1000);
 })();
 </script>
 
