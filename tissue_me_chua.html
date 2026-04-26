@@ -1582,7 +1582,7 @@ function renderHealthBar(score){
 }
 function renderBatchOverview(){
   const el=document.getElementById('batchOverview'); if(!el)return;
-  const batches=batchStats().filter(b=>b.name!=='No Batch').slice(0,5);
+  const batches=batchStats().filter(b=>b.name!=='No Batch').sort((a,b)=>b.avg-a.avg||b.active-a.active||b.total-a.total).slice(0,3);
   if(!batches.length){el.innerHTML='<div class="empty" style="padding:18px"><div class="empty-text">ยังไม่มี Batch — เริ่มใส่ชื่อ Batch ตอนเพิ่ม Culture ใหม่</div></div>';return;}
   el.innerHTML=batches.map(b=>`<div class="batch-card">
     <div class="batch-name">${b.name}</div>
