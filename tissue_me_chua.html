@@ -3815,164 +3815,179 @@ function refreshCurrentPage(){
   document.addEventListener('DOMContentLoaded',()=>setTimeout(()=>{ensureExperimentUI(); setupExperimentRealtime(); populateExperimentFormulaSelect(); renderExperimentMode();},900));
   setTimeout(()=>{ensureExperimentUI(); setupExperimentRealtime(); renderExperimentMode();},1500);
 })();
-
-/* =========================================================
-   REQUESTED PATCH ONLY — USERS PERMISSIONS + APPROVAL FLOW
-   - Hide Super Admin from "ผู้ใช้ทั้งหมด"
-   - Super Admin only can set permission checkboxes
-   - Add/Edit/Delete Culture, Plant, Note, Formula require Super Admin approval
-   ========================================================= */
-(function(){
-  const RESOURCE_LABELS={cultures:'Culture',plants:'ชนิดพืช',notes:'บันทึก',formulas:'สูตรอาหาร'};
-  const ACTION_LABELS={add:'เพิ่ม',edit:'แก้ไข',delete:'ลบ'};
-  const COLLECTIONS={cultures:'cultures',plants:'plants',notes:'notes',formulas:'formulas'};
-  function isSA(){return !!(typeof isCurrentSuperAdmin==='function' && isCurrentSuperAdmin());}
-  function safeText(v){return String(v??'').replace(/[&<>"]/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[m]||m));}
-  function nowLocal(){return (typeof localDateTimeInput==='function')?localDateTimeInput():new Date().toISOString();}
-
-  getPerms=function(user=currentUser){
-    if(!user)return {...DEFAULT_PERMISSIONS};
-    if(isLockedSuperAdminEmail(user.email)||user.superadmin){
-      user=forceLockedSuperAdmin(user);
-      return {viewAllCultures:true,addCultures:true,editCultures:true,deleteCultures:true,managePlants:true,manageFormulas:true,viewNotes:true,editNotes:true,manageLabTools:true,manageUsers:true};
-    }
-    return {...DEFAULT_PERMISSIONS,...(user.permissions||{}),manageUsers:false};
-  };
-  can=function(key){return !!getPerms()[key];};
-
-  function hasPermissionFor(resource,action,item){
-    if(isSA())return true;
-    if(resource==='cultures'){
-      if(action==='add')return can('addCultures');
-      if(action==='edit')return can('editCultures') && (can('viewAllCultures') || !item || ownsItem(item));
-      if(action==='delete')return can('deleteCultures') && (can('viewAllCultures') || !item || ownsItem(item));
-    }
-    if(resource==='plants')return can('managePlants');
-    if(resource==='formulas')return can('manageFormulas');
-    if(resource==='notes')return can('editNotes') && (action==='add' || can('viewAllCultures') || !item || ownsItem(item));
-    return false;
-  }
-  function getCache(resource){
-    if(resource==='cultures')return DB._cultures||[];
-    if(resource==='plants')return DB._plants||[];
-    if(resource==='formulas')return DB._formulas||[];
-    if(resource==='notes')return DB._notes||[];
-    return [];
-  }
-  function getExisting(resource,id){return getCache(resource).find(x=>x.id===id);}
-  async function submitApprovalRequest(resource,action,payload){
-    const {db,doc,setDoc}=FS;
-    const id='req_'+Date.now()+'_'+Math.random().toString(36).slice(2,7);
-    const req={id,resource,action,resourceLabel:RESOURCE_LABELS[resource]||resource,actionLabel:ACTION_LABELS[action]||action,data:payload.data||null,targetId:payload.targetId||payload.data?.id||'',before:payload.before||null,requestedBy:currentUser?.id||'',requestedByName:currentUser?.name||'',requestedByEmail:currentUser?.email||'',status:'pending',createdAt:nowLocal()};
-    await setDoc(doc(db,'pendingRequests',id),req);
-    if(!DB._pendingRequests)DB._pendingRequests=[];
-    DB._pendingRequests.unshift(req);
-    showToast('ส่งคำขอรอ Super Admin อนุมัติแล้ว');
-    if(currentPage==='settings')renderUserManagement();
-    return req;
-  }
-  DB._pendingRequests=DB._pendingRequests||[];
-  DB.pendingRequests=function(){return (this._pendingRequests||[]).filter(r=>r.status==='pending');};
-  const raw={saveCulture:DB.saveCulture.bind(DB),deleteCultureById:DB.deleteCultureById.bind(DB),savePlant:DB.savePlant.bind(DB),deletePlantById:DB.deletePlantById.bind(DB),saveFormula:DB.saveFormula.bind(DB),deleteFormulaById:DB.deleteFormulaById.bind(DB),saveNote:DB.saveNote.bind(DB),deleteNoteById:DB.deleteNoteById.bind(DB),saveUser:DB.saveUser.bind(DB)};
-  window.__approvalRawDB=raw;
-  async function saveWithApproval(resource,obj,rawSave){
-    if(!currentUser || isSA())return rawSave(obj);
-    const old=getExisting(resource,obj.id);
-    const action=old?'edit':'add';
-    if(!hasPermissionFor(resource,action,old)){showToast('บัญชีนี้ไม่มีสิทธิ์');return;}
-    await submitApprovalRequest(resource,action,{data:obj,before:old||null});
-  }
-  async function deleteWithApproval(resource,id,rawDelete){
-    if(!currentUser || isSA())return rawDelete(id);
-    const old=getExisting(resource,id);
-    if(!hasPermissionFor(resource,'delete',old)){showToast('บัญชีนี้ไม่มีสิทธิ์ลบ');return;}
-    await submitApprovalRequest(resource,'delete',{targetId:id,before:old||null});
-  }
-  DB.saveCulture=function(c){return saveWithApproval('cultures',c,raw.saveCulture);};
-  DB.deleteCultureById=function(id){return deleteWithApproval('cultures',id,raw.deleteCultureById);};
-  DB.savePlant=function(p){return saveWithApproval('plants',p,raw.savePlant);};
-  DB.deletePlantById=function(id){return deleteWithApproval('plants',id,raw.deletePlantById);};
-  DB.saveFormula=function(f){return saveWithApproval('formulas',f,raw.saveFormula);};
-  DB.deleteFormulaById=function(id){return deleteWithApproval('formulas',id,raw.deleteFormulaById);};
-  DB.saveNote=function(n){return saveWithApproval('notes',n,raw.saveNote);};
-  DB.deleteNoteById=function(id){return deleteWithApproval('notes',id,raw.deleteNoteById);};
-
-  window.approveDataRequest=async function(id){
-    if(!isSA()){showToast('เฉพาะ Super Admin เท่านั้น');return;}
-    const req=(DB._pendingRequests||[]).find(r=>r.id===id);
-    if(!req)return;
-    const {db,doc,setDoc,deleteDoc}=FS;
-    const col=COLLECTIONS[req.resource];
-    if(!col)return;
-    if(req.action==='delete')await deleteDoc(doc(db,col,req.targetId));
-    else await setDoc(doc(db,col,req.data.id),req.data);
-    await deleteDoc(doc(db,'pendingRequests',id));
-    DB._pendingRequests=(DB._pendingRequests||[]).filter(r=>r.id!==id);
-    showToast('อนุมัติคำขอแล้ว');
-    renderUserManagement(); refreshCurrentPage();
-  };
-  window.rejectDataRequest=async function(id){
-    if(!isSA()){showToast('เฉพาะ Super Admin เท่านั้น');return;}
-    const {db,doc,deleteDoc}=FS;
-    await deleteDoc(doc(db,'pendingRequests',id));
-    DB._pendingRequests=(DB._pendingRequests||[]).filter(r=>r.id!==id);
-    showToast('ไม่อนุมัติคำขอแล้ว');
-    renderUserManagement();
-  };
-  function renderPendingDataRequests(){
-    if(!isSA())return '';
-    const reqs=(DB._pendingRequests||[]).filter(r=>r.status==='pending');
-    if(!reqs.length)return `<div class="card" style="margin-top:12px"><div class="section-label">คำขอแก้ไขข้อมูล</div><div style="font-size:12px;color:var(--text3);padding:8px 0">ไม่มีคำขอรออนุมัติ</div></div>`;
-    return `<div class="card" style="margin-top:12px"><div class="section-label">คำขอแก้ไขข้อมูล</div>${reqs.map(r=>`<div class="user-item"><div class="user-avatar" style="background:var(--warn-light);color:var(--warn-text)">!</div><div style="flex:1"><div class="user-name">${safeText(r.actionLabel)} ${safeText(r.resourceLabel)}</div><div style="font-size:11px;color:var(--text3)">${safeText(r.requestedByName||r.requestedByEmail)} · ${safeText(r.createdAt||'')}</div><div style="font-size:11px;color:var(--text2)">ID: ${safeText(r.targetId||r.data?.id||'-')}</div></div><div style="display:flex;flex-direction:column;gap:5px"><button class="btn btn-outline btn-sm" style="color:var(--accent);border-color:var(--accent)" onclick="approveDataRequest('${r.id}')">อนุมัติ</button><button class="btn btn-outline btn-sm" style="color:var(--danger);border-color:var(--danger)" onclick="rejectDataRequest('${r.id}')">ปฏิเสธ</button></div></div>`).join('')}</div>`;
-  }
-  function permissionCheckboxMulti(user,keys,label){
-    const perms=getPerms(user);
-    const checked=keys.every(k=>!!perms[k])?'checked':'';
-    const disabled=isSA()?'':'disabled';
-    const keyText=keys.join('|');
-    return `<label style="display:flex;align-items:center;gap:6px;font-size:11px;color:var(--text2);margin:4px 0"><input type="checkbox" ${checked} ${disabled} onchange="toggleUserPermissionMulti('${user.id}','${keyText}',this.checked)">${label}</label>`;
-  }
-  window.toggleUserPermissionMulti=async function(id,keyText,value){
-    if(!isSA()){showToast('เฉพาะ Super Admin เท่านั้นที่กำหนดสิทธิ์ได้');return;}
-    const u=DB.users().find(x=>x.id===id);
-    if(!u||u.superadmin||isLockedSuperAdminEmail(u.email))return;
-    const keys=keyText.split('|').filter(Boolean);
-    u.permissions={...DEFAULT_PERMISSIONS,...(u.permissions||{})};
-    keys.forEach(k=>u.permissions[k]=!!value);
-    if(keys.includes('editNotes')&&value)u.permissions.viewNotes=true;
-    await raw.saveUser(u);
-    showToast('อัปเดตสิทธิ์แล้ว');
-    renderUserManagement(); applyPermissionUI();
-  };
-  renderUserManagement=function(){
-    const users=(DB.users()||[]).filter(u=>!isLockedSuperAdminEmail(u.email)&&!u.superadmin);
-    const pending=users.filter(u=>!u.approved);
-    const approved=users.filter(u=>u.approved);
-    const pendHtml=pending.length?pending.map(u=>`<div class="user-item"><div class="user-avatar" style="background:var(--warn-light);color:var(--warn-text)">${safeText(u.avatar||u.name?.[0]||'?')}</div><div style="flex:1"><div class="user-name">${safeText(u.name)}</div><div style="font-size:11px;color:var(--text3)">${safeText(u.email)}</div><span class="user-role role-user">รออนุมัติ</span></div><div style="display:flex;gap:6px">${isSA()?`<button class="btn btn-outline btn-sm" style="color:var(--accent);border-color:var(--accent)" onclick="approveUser('${u.id}')">อนุมัติ</button><button class="btn btn-outline btn-sm" style="color:var(--danger);border-color:var(--danger)" onclick="rejectUser('${u.id}')">ปฏิเสธ</button>`:`<span style="font-size:11px;color:var(--text3)">รอ Super Admin</span>`}</div></div>`).join(''):'<div style="font-size:12px;color:var(--text3);padding:8px 0">ไม่มีคำขอสมัครใหม่</div>';
-    const pendingEl=document.getElementById('pendingUsers');
-    if(pendingEl)pendingEl.innerHTML=`<div class="card">${pendHtml}</div>${renderPendingDataRequests()}`;
-    const userRows=approved.map(u=>{
-      const roleLabel=u.role==='admin'?'Admin':'User'; const roleClass=u.role==='admin'?'role-admin':'role-user';
-      return `<div class="user-item"><div class="user-avatar" style="background:var(--accent-light);color:var(--accent-text)">${safeText(u.avatar||u.name?.[0]||'?')}</div><div style="flex:1"><div class="user-name">${safeText(u.name)}</div><div style="font-size:11px;color:var(--text3)">${safeText(u.email)}</div><span class="user-role ${roleClass}">${roleLabel}</span><div style="margin-top:6px;display:grid;grid-template-columns:1fr;gap:0">${permissionCheckboxMulti(u,['addCultures','editCultures'],'แก้ไข,เพิ่ม Culture')}${permissionCheckboxMulti(u,['deleteCultures'],'ลบ Culture')}${permissionCheckboxMulti(u,['managePlants'],'จัดการชนิดพืช')}${permissionCheckboxMulti(u,['manageLabTools'],'จัดการแล็บ')}${permissionCheckboxMulti(u,['editNotes'],'แก้ไข,เพิ่ม บันทึก')}${permissionCheckboxMulti(u,['manageFormulas'],'แก้ไข,เพิ่ม สูตรอาหาร')}</div></div></div>`;
-    }).join('');
-    const addUserForm=isSA()?`<div class="card" style="margin-top:12px"><div class="section-label" style="margin-bottom:10px">เพิ่มผู้ใช้โดย Super Admin</div><div class="form-group"><label class="form-label">ชื่อ-นามสกุล</label><input class="inp" id="adminNewName" placeholder="ชื่อผู้ใช้"/></div><div class="form-group"><label class="form-label">อีเมล</label><input class="inp" id="adminNewEmail" type="email" placeholder="อีเมล"/></div><div class="form-group"><label class="form-label">รหัสผ่าน</label><input class="inp" id="adminNewPass" type="password" placeholder="อย่างน้อย 6 ตัวอักษร"/></div><div class="form-group" style="margin-bottom:10px"><label class="form-label">สถานะ</label><select class="inp" id="adminNewRole"><option value="user">User</option><option value="admin">Admin</option></select></div><button class="btn btn-primary" onclick="adminAddUser()">เพิ่มผู้ใช้</button></div>`:'';
-    const allUsersEl=document.getElementById('allUsers');
-    if(allUsersEl)allUsersEl.innerHTML=`<div class="card">${userRows||'<div style="font-size:12px;color:var(--text3);padding:8px 0">ไม่มีผู้ใช้อื่น</div>'}</div>${addUserForm}`;
-  };
-  const oldApproveUser=window.approveUser; window.approveUser=async function(id){if(!isSA()){showToast('เฉพาะ Super Admin เท่านั้นที่อนุมัติผู้ใช้ได้');return;} return oldApproveUser(id);};
-  const oldRejectUser=window.rejectUser; window.rejectUser=async function(id){if(!isSA()){showToast('เฉพาะ Super Admin เท่านั้นที่ปฏิเสธผู้ใช้ได้');return;} return oldRejectUser(id);};
-  const oldAdminAddUser=window.adminAddUser; window.adminAddUser=async function(){if(!isSA()){showToast('เฉพาะ Super Admin เท่านั้นที่เพิ่มผู้ใช้ได้');return;} return oldAdminAddUser();};
-  const oldApplyPermissionUI=window.applyPermissionUI||applyPermissionUI;
-  applyPermissionUI=function(){try{oldApplyPermissionUI&&oldApplyPermissionUI();}catch(e){} const navLab=document.getElementById('nav-lab'); if(navLab)navLab.style.display=(isSA()||can('manageLabTools'))?'flex':'none'; const fab=document.getElementById('mainFab'); if(fab)fab.classList.toggle('hidden',currentPage!=='list'||!can('addCultures'));};
-  const oldShowPage=window.showPage||showPage;
-  showPage=function(name){if(name==='lab' && !(isSA()||can('manageLabTools'))){showToast('บัญชีนี้ไม่มีสิทธิ์เข้าถึงหน้าแล็บ');return;} return oldShowPage(name);};
-  const oldSetupRealtimeSync=window.setupRealtimeSync||setupRealtimeSync;
-  setupRealtimeSync=function(){oldSetupRealtimeSync&&oldSetupRealtimeSync(); try{const {db,collection,onSnapshot}=FS; if(window._unsubPendingRequests)window._unsubPendingRequests(); window._unsubPendingRequests=onSnapshot(collection(db,'pendingRequests'),snap=>{DB._pendingRequests=snap.docs.map(d=>d.data()).filter(r=>r.status==='pending'); if(currentPage==='settings')renderUserManagement();});}catch(e){console.warn('pending requests sync failed',e);}};
-  const oldLoadAll=DB.loadAll.bind(DB);
-  DB.loadAll=async function(){await oldLoadAll(); try{const {db,collection,getDocs}=FS; const rq=await getDocs(collection(db,'pendingRequests')); this._pendingRequests=rq.docs.map(d=>d.data()).filter(r=>r.status==='pending');}catch(e){this._pendingRequests=[];}};
-})();
 </script>
 
+
+<!-- PRODUCTION STABILITY LAYER: no data schema changes -->
+<script>
+(function(){
+  if(window.__tmcProductionLayerInstalled) return;
+  window.__tmcProductionLayerInstalled = true;
+
+  const PROD = {
+    version: 'production-stability-1.0',
+    saving: false,
+    fsPatched: false,
+    lastErrorAt: 0,
+    pendingTimers: {},
+  };
+  window.TMC_PROD = PROD;
+
+  function ready(fn){
+    if(document.readyState === 'loading') document.addEventListener('DOMContentLoaded', fn);
+    else fn();
+  }
+
+  function ensureStyle(){
+    if(document.getElementById('tmcProdStyle')) return;
+    const style=document.createElement('style');
+    style.id='tmcProdStyle';
+    style.textContent=`
+      #tmcProdOffline{position:fixed;left:50%;top:10px;transform:translateX(-50%);z-index:99999;max-width:440px;width:calc(100% - 24px);background:#fee2e2;color:#7f1d1d;border:1px solid #fca5a5;border-radius:10px;padding:9px 12px;font-size:12px;text-align:center;box-shadow:0 4px 12px rgba(0,0,0,.08)}
+      #tmcProdToast{position:fixed;left:50%;bottom:86px;transform:translateX(-50%);z-index:99999;max-width:420px;width:max-content;max-width:calc(100% - 32px);background:#1a1917;color:#fff;border-radius:999px;padding:9px 14px;font-size:12px;box-shadow:0 6px 18px rgba(0,0,0,.16);display:none}
+      .tmc-saving{opacity:.65;pointer-events:none!important}
+    `;
+    document.head.appendChild(style);
+  }
+
+  function toast(msg){
+    ready(()=>{
+      ensureStyle();
+      let el=document.getElementById('tmcProdToast');
+      if(!el){el=document.createElement('div');el.id='tmcProdToast';document.body.appendChild(el);}
+      el.textContent=msg;
+      el.style.display='block';
+      clearTimeout(PROD.pendingTimers.toast);
+      PROD.pendingTimers.toast=setTimeout(()=>{el.style.display='none';},2600);
+    });
+  }
+
+  function setOfflineBanner(){
+    ready(()=>{
+      ensureStyle();
+      let el=document.getElementById('tmcProdOffline');
+      if(navigator.onLine){ if(el) el.remove(); return; }
+      if(!el){
+        el=document.createElement('div');
+        el.id='tmcProdOffline';
+        el.textContent='ออฟไลน์อยู่: ข้อมูลอาจยังไม่ซิงก์กับ Cloud';
+        document.body.appendChild(el);
+      }
+    });
+  }
+
+  window.addEventListener('online',()=>{setOfflineBanner(); toast('กลับมาออนไลน์แล้ว');});
+  window.addEventListener('offline',()=>{setOfflineBanner();});
+
+  window.addEventListener('error',(e)=>{
+    console.error('[TMC Production Error]', e.message, e.error || '');
+    const now=Date.now();
+    if(now-PROD.lastErrorAt>4000){PROD.lastErrorAt=now; toast('พบข้อผิดพลาด แต่แอปยังทำงานต่อได้');}
+  });
+
+  window.addEventListener('unhandledrejection',(e)=>{
+    console.error('[TMC Production Promise Error]', e.reason || e);
+    const now=Date.now();
+    if(now-PROD.lastErrorAt>4000){PROD.lastErrorAt=now; toast('เชื่อมต่อ/บันทึกไม่สำเร็จ กรุณาลองอีกครั้ง');}
+  });
+
+  function waitForFS(cb, tries=80){
+    if(window.FS && window.FS.db) return cb();
+    if(tries<=0) return console.warn('[TMC] Firebase not ready');
+    setTimeout(()=>waitForFS(cb, tries-1),150);
+  }
+
+  async function retryAsync(fn, times=3, delay=350){
+    let last;
+    for(let i=0;i<times;i++){
+      try{return await fn();}
+      catch(e){last=e; await new Promise(r=>setTimeout(r, delay*(i+1)));}
+    }
+    throw last;
+  }
+
+  function patchFS(){
+    if(PROD.fsPatched || !window.FS) return;
+    PROD.fsPatched=true;
+    ['setDoc','updateDoc','deleteDoc','getDoc','getDocs'].forEach(name=>{
+      if(typeof window.FS[name] !== 'function') return;
+      const original=window.FS[name];
+      window.FS[name]=function(...args){
+        return retryAsync(()=>original.apply(this,args),3,300);
+      };
+    });
+  }
+
+  function patchButtons(){
+    document.addEventListener('click', function(e){
+      const btn=e.target.closest('button');
+      if(!btn) return;
+      const action=(btn.getAttribute('onclick')||'').toLowerCase();
+      const text=(btn.textContent||'').toLowerCase();
+      const isWrite = /save|delete|remove|approve|reject|add|update|บันทึก|ลบ|อนุมัติ|เพิ่ม|แก้ไข/.test(action+' '+text);
+      if(!isWrite) return;
+      if(btn.dataset.tmcBusy==='1'){
+        e.preventDefault();
+        e.stopImmediatePropagation();
+        return false;
+      }
+      btn.dataset.tmcBusy='1';
+      btn.classList.add('tmc-saving');
+      setTimeout(()=>{btn.dataset.tmcBusy='0';btn.classList.remove('tmc-saving');},1200);
+    }, true);
+  }
+
+  function patchNavigationRecovery(){
+    const originalShowPage=window.showPage;
+    if(typeof originalShowPage==='function' && !window.__tmcShowPageStable){
+      window.__tmcShowPageStable=true;
+      window.showPage=function(name){
+        try{
+          originalShowPage.apply(this,arguments);
+          setTimeout(()=>{
+            const hasActive=document.querySelector('.page.active');
+            if(!hasActive){
+              const target=document.getElementById('page-'+name)||document.querySelector('.page');
+              if(target) target.classList.add('active');
+            }
+          },60);
+        }catch(err){
+          console.error('[TMC showPage recovery]',err);
+          const target=document.getElementById('page-'+name)||document.querySelector('.page');
+          if(target){document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));target.classList.add('active');}
+        }
+      };
+    }
+  }
+
+  function ensureLoadingFailsafe(){
+    const loader=document.getElementById('loadingScreen');
+    if(!loader) return;
+    setTimeout(()=>{
+      if(!loader.classList.contains('hidden')) loader.classList.add('hidden');
+    },12000);
+  }
+
+  function sanitizeNullText(){
+    document.querySelectorAll('body *').forEach(el=>{
+      if(el.children.length===0 && typeof el.textContent==='string'){
+        const t=el.textContent.trim();
+        if(t==='null' || t==='undefined' || t==='NaN') el.textContent='-';
+      }
+    });
+  }
+
+  ready(()=>{
+    ensureStyle();
+    setOfflineBanner();
+    patchButtons();
+    ensureLoadingFailsafe();
+    waitForFS(()=>{patchFS();});
+    setTimeout(patchNavigationRecovery,500);
+    setInterval(()=>{patchNavigationRecovery(); sanitizeNullText();},5000);
+  });
+})();
+</script>
 
 </body>
 </html>
