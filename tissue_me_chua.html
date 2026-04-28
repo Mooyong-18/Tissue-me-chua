@@ -3976,3 +3976,169 @@ function refreshCurrentPage(){
 
 </body>
 </html>
+// =========================
+// UPDATE HISTORY FIX - READY TO USE
+// =========================
+
+window.currentImage = window.currentImage || null;
+window._savingUpdate = false;
+
+function getInputValue(id, fallback = "") {
+  const el = document.getElementById(id);
+  return el ? el.value : fallback;
+}
+
+function getNumberValue(id) {
+  const value = getInputValue(id, "");
+  if (value === "" || value === null || value === undefined) return null;
+  const num = Number(value);
+  return Number.isFinite(num) ? num : null;
+}
+
+function formatDate(iso) {
+  if (!iso) return "-";
+  const d = new Date(iso);
+  return d.toLocaleString("th-TH", {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit"
+  });
+}
+
+function normalizeUpdate(u = {}) {
+  return {
+    shoots: u.shoots ?? null,
+    roots: u.roots ?? null,
+    length: u.length ?? null,
+    status: u.status || "Normal",
+    note: u.note || "",
+    image: u.image || null,
+    updatedAt: u.updatedAt || new Date().toISOString(),
+    timestamp: u.timestamp || new Date(u.updatedAt || Date.now()).getTime()
+  };
+}
+
+function isSameUpdate(a, b) {
+  return (
+    (a.shoots ?? null) === (b.shoots ?? null) &&
+    (a.roots ?? null) === (b.roots ?? null) &&
+    (a.length ?? null) === (b.length ?? null) &&
+    (a.status || "") === (b.status || "") &&
+    (a.note || "") === (b.note || "") &&
+    (a.image || null) === (b.image || null)
+  );
+}
+
+async function saveUpdate(cultureId) {
+  const { db, doc, getDoc, updateDoc } = window.FS;
+
+  if (window._savingUpdate) return;
+  window._savingUpdate = true;
+
+  try {
+    const ref = doc(db, "cultures", cultureId);
+    const snap = await getDoc(ref);
+
+    if (!snap.exists()) {
+      alert("ไม่พบข้อมูล Culture");
+      return;
+    }
+
+    const culture = snap.data();
+    const now = new Date();
+
+    const newUpdate = normalizeUpdate({
+      shoots: getNumberValue("inputShoots"),
+      roots: getNumberValue("inputRoots"),
+      length: getNumberValue("inputLength"),
+      status: getInputValue("inputStatus", "Normal"),
+      note: getInputValue("inputNote", ""),
+      image: window.currentImage || null,
+      updatedAt: now.toISOString(),
+      timestamp: now.getTime()
+    });
+
+    let updates = Array.isArray(culture.updates)
+      ? culture.updates.map(normalizeUpdate)
+      : [];
+
+    const latest = [...updates].sort((a, b) => b.timestamp - a.timestamp)[0];
+
+    if (latest && isSameUpdate(latest, newUpdate)) {
+      alert("ข้อมูลเหมือนรายการล่าสุด ระบบไม่บันทึกซ้ำ");
+      return;
+    }
+
+    updates.push(newUpdate);
+    updates.sort((a, b) => a.timestamp - b.timestamp);
+
+    await updateDoc(ref, {
+      updates,
+      status: newUpdate.status,
+      shoots: newUpdate.shoots,
+      roots: newUpdate.roots,
+      length: newUpdate.length,
+      note: newUpdate.note,
+      image: newUpdate.image,
+      updatedAt: newUpdate.updatedAt,
+      lastUpdateAt: newUpdate.updatedAt
+    });
+
+    alert("บันทึกอัปเดตสำเร็จ");
+
+    if (typeof loadCultureDetail === "function") {
+      loadCultureDetail(cultureId);
+    }
+
+    if (typeof closeModal === "function") {
+      closeModal();
+    }
+
+  } catch (error) {
+    console.error("saveUpdate error:", error);
+    alert("เกิดข้อผิดพลาดในการบันทึก");
+  } finally {
+    window._savingUpdate = false;
+  }
+}
+
+function renderHistory(updates) {
+  const container =
+    document.getElementById("historyList") ||
+    document.getElementById("updateHistory") ||
+    document.getElementById("cultureHistory");
+
+  if (!container) return;
+
+  const list = Array.isArray(updates)
+    ? updates.map(normalizeUpdate).sort((a, b) => b.timestamp - a.timestamp)
+    : [];
+
+  if (list.length === 0) {
+    container.innerHTML = `<div style="color:#9c9890">ยังไม่มีประวัติอัปเดต</div>`;
+    return;
+  }
+
+  container.innerHTML = list.map(u => `
+    <div class="tl-item">
+      <div class="tl-dot"></div>
+      <div class="tl-date">${formatDate(u.updatedAt)}</div>
+      <div class="tl-text">
+        <span class="badge ${u.status === "Contaminated" ? "b-cont" : "b-norm"}">
+          ${u.status}
+        </span>
+        ${u.shoots !== null ? ` · ${u.shoots} ยอด` : ""}
+        ${u.roots !== null ? ` · ${u.roots} ราก` : ""}
+        ${u.length !== null ? ` · ${u.length} cm` : ""}
+      </div>
+      ${u.note ? `<div class="tl-sub">${u.note}</div>` : ""}
+      ${u.image ? `
+        <div style="margin-top:8px">
+          <img src="${u.image}" style="width:90px;height:90px;object-fit:cover;border-radius:10px;border:1px solid #ddd">
+        </div>
+      ` : ""}
+    </div>
+  `).join("");
+}
