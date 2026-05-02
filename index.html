@@ -379,7 +379,7 @@ textarea.inp{resize:vertical;min-height:72px}
       </div>
       <div id="alertsSection" class="section" style="padding-top:0"></div>
       <div class="section" style="padding-top:0">
-        <div class="section-label">Lab KPI / ตัวชี้วัดแล็บ</div>
+        <div class="section-label">Temperature KPI / ตัวชี้วัดอุณหภูมิ</div>
         <div id="proKpiGrid" class="pro-grid"></div>
       </div>
       <div class="section" style="padding-top:0">
@@ -531,48 +531,10 @@ textarea.inp{resize:vertical;min-height:72px}
       </div>
     </div>
 
-    <!-- LAB PAGE (Schedule + Inventory + Protocol + Temp + Alerts) -->
-    <div id="page-lab" class="page">
+    <!-- TEMPERATURE PAGE -->
+    <div id="page-temp" class="page">
       <div class="section">
-        <!-- Tab bar -->
-        <div style="display:flex;background:var(--bg2);border-radius:var(--radius-sm);padding:3px;margin-bottom:16px;gap:2px" id="labTabs">
-          <button class="tab-btn active" onclick="switchLabTab('schedule',this)" style="flex:1;font-size:11px;padding:7px 4px">📅 ตาราง</button>
-          <button class="tab-btn" onclick="switchLabTab('inventory',this)" style="flex:1;font-size:11px;padding:7px 4px">📦 สต็อก</button>
-          <button class="tab-btn" onclick="switchLabTab('protocol',this)" style="flex:1;font-size:11px;padding:7px 4px">🧪 Protocol</button>
-          <button class="tab-btn" onclick="switchLabTab('temp',this)" style="flex:1;font-size:11px;padding:7px 4px">🌡️ อุณหภูมิ</button>
-          <button class="tab-btn" onclick="switchLabTab('alerts',this)" style="flex:1;font-size:11px;padding:7px 4px">🔔 แจ้งเตือน</button>
-        </div>
-
-        <!-- SCHEDULE TAB -->
-        <div id="labTab-schedule">
-          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
-            <div class="section-label" style="margin:0">ตารางงานแล็บ</div>
-            <button class="btn btn-outline btn-sm" onclick="openTaskModal()">+ เพิ่มงาน</button>
-          </div>
-          <div id="scheduleList"></div>
-        </div>
-
-        <!-- INVENTORY TAB -->
-        <div id="labTab-inventory" class="hidden">
-          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
-            <div class="section-label" style="margin:0">สต็อกสารเคมี</div>
-            <button class="btn btn-outline btn-sm" onclick="openChemModal()">+ เพิ่มสาร</button>
-          </div>
-          <div id="inventoryList"></div>
-        </div>
-
-        <!-- PROTOCOL TAB -->
-        <div id="labTab-protocol" class="hidden">
-          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
-            <div class="section-label" style="margin:0">Protocol Library</div>
-            <button class="btn btn-outline btn-sm" onclick="openProtocolModal()">+ เพิ่ม</button>
-          </div>
-          <div id="protocolList"></div>
-        </div>
-
-        <!-- TEMP TAB -->
-        <div id="labTab-temp" class="hidden">
-          <div class="section-label" style="margin-bottom:12px">บันทึกอุณหภูมิ</div>
+        <div class="section-label" style="margin-bottom:12px">บันทึกอุณหภูมิ</div>
           <div class="card" style="margin-bottom:14px">
             <div class="form-row">
               <div class="form-group" style="margin:0">
@@ -604,13 +566,7 @@ textarea.inp{resize:vertical;min-height:72px}
           <div class="card" style="margin-bottom:14px"><div class="chart-container"><canvas id="tempChart"></canvas></div></div>
           <div class="section-label">ประวัติล่าสุด</div>
           <div id="tempHistory"></div>
-        </div>
 
-        <!-- ALERTS TAB -->
-        <div id="labTab-alerts" class="hidden">
-          <div class="section-label" style="margin-bottom:12px">การแจ้งเตือน</div>
-          <div id="alertsList"></div>
-        </div>
       </div>
     </div>
 
@@ -699,9 +655,9 @@ textarea.inp{resize:vertical;min-height:72px}
       <svg viewBox="0 0 20 20" fill="none" stroke="currentColor"><path d="M3 15l4-6 4 3 4-7" stroke-linecap="round" stroke-linejoin="round"/><rect x="2" y="2" width="16" height="16" rx="2"/></svg>
       วิเคราะห์
     </button>
-    <button class="nav-btn" onclick="showPage('lab')" id="nav-lab">
-      <svg viewBox="0 0 20 20" fill="none" stroke="currentColor"><path d="M7 3v7l-3 5h12l-3-5V3M7 3h6" stroke-linecap="round" stroke-linejoin="round"/></svg>
-      แล็บ
+    <button class="nav-btn" onclick="showPage('temp')" id="nav-temp">
+      <svg viewBox="0 0 20 20" fill="none" stroke="currentColor"><path d="M10 3v8.5" stroke-linecap="round"/><circle cx="10" cy="14" r="3"/><path d="M10 11.5a3 3 0 1 0 0 5.5" stroke-linecap="round"/></svg>
+      อุณหภูมิ
     </button>
     <button class="nav-btn" onclick="showPage('settings')" id="nav-settings">
       <svg viewBox="0 0 20 20" fill="none" stroke="currentColor"><circle cx="10" cy="10" r="3"/><path d="M10 2v2M10 16v2M2 10h2M16 10h2M4.22 4.22l1.42 1.42M14.36 14.36l1.42 1.42M4.22 15.78l1.42-1.42M14.36 5.64l1.42-1.42"/></svg>
@@ -1474,7 +1430,7 @@ function showPage(name){
   currentPage=name;
   document.getElementById('mainTopbar').classList.remove('hidden');
   document.getElementById('detailTopbar').classList.add('hidden');
-  const titles={dashboard:'หน้าหลัก',list:'รายการ Culture',add:editMode?'แก้ไข Culture':'เพิ่ม Culture',analytics:'วิเคราะห์ข้อมูล',lab:'จัดการแล็บ',settings:'ตั้งค่า',detail:''};
+  const titles={dashboard:'หน้าหลัก',list:'รายการ Culture',add:editMode?'แก้ไข Culture':'เพิ่ม Culture',analytics:'วิเคราะห์ข้อมูล',temp:'อุณหภูมิ',settings:'ตั้งค่า',detail:''};
   document.getElementById('topbarTitle').textContent=titles[name]||'';
   const fab=document.getElementById('mainFab');
   fab.classList.toggle('hidden',name!=='list'||!can('addCultures'));
@@ -1483,7 +1439,7 @@ function showPage(name){
   if(name==='dashboard')renderDashboard();
   if(name==='list'){renderFilters();renderList();}
   if(name==='analytics')renderAnalytics();
-  if(name==='lab'){renderSchedule();renderInventory();renderProtocols();renderTempHistory();renderTempChart();renderAlerts();setDefaultDates();}
+  if(name==='temp'){renderTempHistory();renderTempChart();setDefaultDates();}
   if(name==='settings')renderSettings();
   if(name==='add'){if(!editMode){resetAddForm();}populateFormulaSelect();}
 }
@@ -2660,7 +2616,7 @@ function renderUserManagement(){
         ${permissionCheckbox(u,'manageFormulas','จัดการสูตรอาหาร')}
         ${permissionCheckbox(u,'viewNotes','เห็นบันทึก')}
         ${permissionCheckbox(u,'editNotes','เพิ่ม/แก้บันทึก')}
-        ${permissionCheckbox(u,'manageLabTools','จัดการแล็บ')}
+        ${permissionCheckbox(u,'manageLabTools','จัดการอุณหภูมิ')}
       </div>`:''}</div>
       ${actions}
     </div>`;
@@ -3976,7 +3932,7 @@ function refreshCurrentPage(){
     if(pendingEl)pendingEl.innerHTML=`<div class="card">${pendHtml}</div>${renderPendingDataRequests()}`;
     const userRows=approved.map(u=>{
       const roleLabel=u.role==='admin'?'Admin':'User'; const roleClass=u.role==='admin'?'role-admin':'role-user';
-      return `<div class="user-item"><div class="user-avatar" style="background:var(--accent-light);color:var(--accent-text)">${safeText(u.avatar||u.name?.[0]||'?')}</div><div style="flex:1"><div class="user-name">${safeText(u.name)}</div><div style="font-size:11px;color:var(--text3)">${safeText(u.email)}</div><span class="user-role ${roleClass}">${roleLabel}</span><div style="margin-top:6px;display:grid;grid-template-columns:1fr;gap:0">${permissionCheckboxMulti(u,['addCultures','editCultures'],'แก้ไข,เพิ่ม Culture')}${permissionCheckboxMulti(u,['deleteCultures'],'ลบ Culture')}${permissionCheckboxMulti(u,['managePlants'],'จัดการชนิดพืช')}${permissionCheckboxMulti(u,['manageLabTools'],'จัดการแล็บ')}${permissionCheckboxMulti(u,['editNotes'],'แก้ไข,เพิ่ม บันทึก')}${permissionCheckboxMulti(u,['manageFormulas'],'แก้ไข,เพิ่ม สูตรอาหาร')}</div></div></div>`;
+      return `<div class="user-item"><div class="user-avatar" style="background:var(--accent-light);color:var(--accent-text)">${safeText(u.avatar||u.name?.[0]||'?')}</div><div style="flex:1"><div class="user-name">${safeText(u.name)}</div><div style="font-size:11px;color:var(--text3)">${safeText(u.email)}</div><span class="user-role ${roleClass}">${roleLabel}</span><div style="margin-top:6px;display:grid;grid-template-columns:1fr;gap:0">${permissionCheckboxMulti(u,['addCultures','editCultures'],'แก้ไข,เพิ่ม Culture')}${permissionCheckboxMulti(u,['deleteCultures'],'ลบ Culture')}${permissionCheckboxMulti(u,['managePlants'],'จัดการชนิดพืช')}${permissionCheckboxMulti(u,['manageLabTools'],'จัดการอุณหภูมิ')}${permissionCheckboxMulti(u,['editNotes'],'แก้ไข,เพิ่ม บันทึก')}${permissionCheckboxMulti(u,['manageFormulas'],'แก้ไข,เพิ่ม สูตรอาหาร')}</div></div></div>`;
     }).join('');
     const addUserForm=isSA()?`<div class="card" style="margin-top:12px"><div class="section-label" style="margin-bottom:10px">เพิ่มผู้ใช้โดย Super Admin</div><div class="form-group"><label class="form-label">ชื่อ-นามสกุล</label><input class="inp" id="adminNewName" placeholder="ชื่อผู้ใช้"/></div><div class="form-group"><label class="form-label">อีเมล</label><input class="inp" id="adminNewEmail" type="email" placeholder="อีเมล"/></div><div class="form-group"><label class="form-label">รหัสผ่าน</label><input class="inp" id="adminNewPass" type="password" placeholder="อย่างน้อย 6 ตัวอักษร"/></div><div class="form-group" style="margin-bottom:10px"><label class="form-label">สถานะ</label><select class="inp" id="adminNewRole"><option value="user">User</option><option value="admin">Admin</option></select></div><button class="btn btn-primary" onclick="adminAddUser()">เพิ่มผู้ใช้</button></div>`:'';
     const allUsersEl=document.getElementById('allUsers');
@@ -3986,9 +3942,9 @@ function refreshCurrentPage(){
   const oldRejectUser=window.rejectUser; window.rejectUser=async function(id){if(!isSA()){showToast('เฉพาะ Super Admin เท่านั้นที่ปฏิเสธผู้ใช้ได้');return;} return oldRejectUser(id);};
   const oldAdminAddUser=window.adminAddUser; window.adminAddUser=async function(){if(!isSA()){showToast('เฉพาะ Super Admin เท่านั้นที่เพิ่มผู้ใช้ได้');return;} return oldAdminAddUser();};
   const oldApplyPermissionUI=window.applyPermissionUI||applyPermissionUI;
-  applyPermissionUI=function(){try{oldApplyPermissionUI&&oldApplyPermissionUI();}catch(e){} const navLab=document.getElementById('nav-lab'); if(navLab)navLab.style.display=(isSA()||can('manageLabTools'))?'flex':'none'; const fab=document.getElementById('mainFab'); if(fab)fab.classList.toggle('hidden',currentPage!=='list'||!can('addCultures'));};
+  applyPermissionUI=function(){try{oldApplyPermissionUI&&oldApplyPermissionUI();}catch(e){} const navTemp=document.getElementById('nav-temp'); if(navTemp)navTemp.style.display='flex'; const fab=document.getElementById('mainFab'); if(fab)fab.classList.toggle('hidden',currentPage!=='list'||!can('addCultures'));};
   const oldShowPage=window.showPage||showPage;
-  showPage=function(name){if(name==='lab' && !(isSA()||can('manageLabTools'))){showToast('บัญชีนี้ไม่มีสิทธิ์เข้าถึงหน้าแล็บ');return;} return oldShowPage(name);};
+  showPage=function(name){return oldShowPage(name);};
   const oldSetupRealtimeSync=window.setupRealtimeSync||setupRealtimeSync;
   setupRealtimeSync=function(){oldSetupRealtimeSync&&oldSetupRealtimeSync(); try{const {db,collection,onSnapshot}=FS; if(window._unsubPendingRequests)window._unsubPendingRequests(); window._unsubPendingRequests=onSnapshot(collection(db,'pendingRequests'),snap=>{DB._pendingRequests=snap.docs.map(d=>d.data()).filter(r=>r.status==='pending'); if(currentPage==='settings')renderUserManagement();});}catch(e){console.warn('pending requests sync failed',e);}};
   const oldLoadAll=DB.loadAll.bind(DB);
